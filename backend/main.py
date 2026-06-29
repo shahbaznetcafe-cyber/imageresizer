@@ -11,10 +11,24 @@ from starlette.concurrency import run_in_threadpool
 # Import database and image processor modules.
 # The fallback keeps local `uvicorn main:app` usage working from the backend folder.
 try:
-    from .database import init_db, create_session, get_session, update_processed_count
+    from .database import (
+        init_db,
+        create_session,
+        get_activity_summary,
+        get_session,
+        record_processed_images,
+        update_processed_count,
+    )
     from .image_processor import process_single_image, warm_image_processor
 except ImportError:
-    from database import init_db, create_session, get_session, update_processed_count
+    from database import (
+        init_db,
+        create_session,
+        get_activity_summary,
+        get_session,
+        record_processed_images,
+        update_processed_count,
+    )
     from image_processor import process_single_image, warm_image_processor
 
 # Initialize FastAPI application
@@ -114,6 +128,12 @@ def api_create_session(
         
     session = create_session(emis_cleaned, phone_number)
     return session
+
+
+@app.get("/api/activity")
+def api_activity():
+    """Returns live landing-page activity stats and recent image records."""
+    return get_activity_summary()
 
 @app.post("/api/process-images")
 async def api_process_images(
@@ -248,7 +268,8 @@ async def api_process_images(
             print(f"Error creating ZIP: {e}")
             # Non-fatal error: user can still download individually
             
-    # 5. Update processed count in database
+    # 5. Save image records and update processed count in database
+    record_processed_images(session, processed_images)
     new_count = update_processed_count(session_id, len(processed_images))
     
     return {
@@ -256,5 +277,6 @@ async def api_process_images(
         "processed_count": len(processed_images),
         "total_session_count": new_count,
         "images": processed_images,
-        "zip_url": zip_url
+        "zip_url": zip_url,
+        "activity": get_activity_summary()
     }

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { School, Phone, ArrowRight, Loader2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { School, Phone, ArrowRight, Loader2, Images, History } from 'lucide-react';
 import { getApiErrorMessage, getNetworkErrorMessage } from '../utils/apiErrors';
 
 export default function LoginRecordForm({ onLoginSuccess }) {
@@ -7,6 +7,33 @@ export default function LoginRecordForm({ onLoginSuccess }) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [activity, setActivity] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadActivity = async () => {
+      try {
+        const baseUrl = import.meta.env.VITE_API_URL || '';
+        const response = await fetch(`${baseUrl}/api/activity`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (isMounted) {
+          setActivity(data);
+        }
+      } catch {
+        // Activity is helpful, but login should still render if the backend is offline.
+      }
+    };
+
+    loadActivity();
+    const timer = window.setInterval(loadActivity, 15000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -151,6 +178,53 @@ export default function LoginRecordForm({ onLoginSuccess }) {
           )}
         </button>
       </form>
+
+      {activity && (
+        <div className="px-6 pb-5 space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 text-center">
+              <p className="text-[10px] uppercase font-bold text-slate-400">Schools</p>
+              <p className="text-lg font-bold text-punjab-blue">{activity.total_schools}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 text-center">
+              <p className="text-[10px] uppercase font-bold text-slate-400">Sessions</p>
+              <p className="text-lg font-bold text-punjab-green">{activity.total_sessions}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 text-center">
+              <p className="text-[10px] uppercase font-bold text-slate-400">Photos</p>
+              <p className="text-lg font-bold text-slate-800">{activity.total_images}</p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-white p-3">
+            <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+              <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <History size={14} className="text-punjab-blue" />
+                Live Edited Images
+              </p>
+              <p className="urdu-text text-[10px] leading-3 text-slate-400">تازہ ریکارڈ</p>
+            </div>
+
+            {activity.recent_images?.length > 0 ? (
+              <div className="divide-y divide-slate-100">
+                {activity.recent_images.slice(0, 3).map((item, index) => (
+                  <div key={`${item.emis_code}-${item.created_at}-${index}`} className="py-2 flex items-center gap-2 text-xs">
+                    <Images size={14} className="text-punjab-green shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-slate-700 truncate">{item.original_name}</p>
+                      <p className="text-[10px] text-slate-400">EMIS {item.emis_code} · {item.size_kb} KB</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-400 py-3 text-center">
+                No edited images recorded yet.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
       
       <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
         <span>No password required</span>
