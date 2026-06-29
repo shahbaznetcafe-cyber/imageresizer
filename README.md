@@ -97,6 +97,17 @@ This repository is equipped with a `render.yaml` blueprint file for easy, unifie
    - Go to your Frontend service settings in Render, add the environment variable `VITE_API_URL` and set its value to your backend's URL.
    - Re-deploy the frontend service.
 
+### Manual Render Backend Settings
+
+If you create the backend manually instead of using the Blueprint, use these settings:
+
+- Service type: `Web Service`
+- Runtime/language: `Python`
+- Build command: `pip install -r requirements.txt`
+- Start command: `python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+
+If Render logs show `Running build command 'yarn'` or `Running 'gunicorn --bind 0.0.0.0:$PORT wsgi:app'`, the service is using the wrong settings. Change it to the Python settings above, then redeploy.
+
 ---
 
 ## Connecting shahbaznetcafe.com Domain
