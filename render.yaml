@@ -1,0 +1,41 @@
+services:
+  # 1. FastAPI Python Backend Web Service
+  - type: web
+    name: sed-punjab-resizer-backend
+    runtime: python
+    buildCommand: "pip install -r backend/requirements.txt"
+    startCommand: "gunicorn -w 1 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT backend.main:app"
+    envVars:
+      - key: DATABASE_URL
+        value: school_sessions.db
+      - key: U2NET_HOME
+        value: /opt/render/project/src/backend/model_cache
+      - key: PRELOAD_REMBG_MODEL
+        value: "1"
+      - key: PROCESS_MAX_DIM
+        value: "960"
+      - key: REMBG_MODEL
+        value: u2net
+      - key: SUBJECT_MARGIN_PX
+        value: "3"
+      - key: PYTHON_VERSION
+        value: 3.10.12
+
+  # 2. React Static Frontend Service
+  - type: web
+    name: sed-punjab-resizer-frontend
+    runtime: static
+    buildCommand: "cd frontend && npm install && npm run build"
+    publishPath: "frontend/dist"
+    headers:
+      - key: Cache-Control
+        value: "public, max-age=31536000, immutable"
+    routes:
+      # Rewrite all non-file paths to index.html for React Router / SPA
+      - type: rewrite
+        source: "/*"
+        destination: "/index.html"
+    envVars:
+      - key: VITE_API_URL
+        # Set this to the URL of the backend web service on Render
+        value: https://sed-punjab-resizer-backend.onrender.com

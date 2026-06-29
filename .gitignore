@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+venv/
+.venv/
+
+# Local backend runtime data
+backend/school_sessions.db
+backend/processed_temp/
+backend/model_cache/
+backend/backend-server.*.log
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+
+# Environment files
+.env
+.env.local
+frontend/.env
+frontend/.env.local
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
