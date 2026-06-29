@@ -126,5 +126,9 @@ For Vercel, deploy the **frontend**:
    npm run build
    ```
 5. Set `VITE_API_URL` in Vercel Environment Variables to your live backend URL.
+   - Example: `VITE_API_URL=https://your-backend-name.onrender.com`
+   - After changing this variable, redeploy the Vercel project.
+
+Vercel hosts only the frontend. Login, school records, image processing, and dashboard activity require the FastAPI backend to be live and connected through `VITE_API_URL`.
 
 The FastAPI backend is better hosted on Render, Railway, Fly.io, or another Python web-service host. Vercel serverless functions are not ideal for this backend because `rembg`/ONNX model loading is large, cold starts can be slow, and processed image files are temporary.

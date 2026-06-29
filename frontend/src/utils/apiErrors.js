@@ -1,5 +1,5 @@
 const DEFAULT_BACKEND_MESSAGE =
-  'Backend API is not reachable. Please start the backend server or set VITE_API_URL to your live backend.';
+  'Backend API is not connected. On Vercel, set VITE_API_URL to your live FastAPI backend URL, then redeploy.';
 
 export async function getApiErrorMessage(response, fallbackMessage) {
   const contentType = response.headers.get('content-type') || '';
@@ -19,6 +19,10 @@ export async function getApiErrorMessage(response, fallbackMessage) {
     } catch {
       return fallbackMessage || DEFAULT_BACKEND_MESSAGE;
     }
+  }
+
+  if (!contentType.includes('application/json')) {
+    return DEFAULT_BACKEND_MESSAGE;
   }
 
   return fallbackMessage || DEFAULT_BACKEND_MESSAGE;
