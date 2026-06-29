@@ -1,9 +1,10 @@
 fastapi>=0.100.0
 uvicorn>=0.22.0
 pillow>=10.0.0
-rembg>=2.0.30
+rembg[cpu]>=2.0.76
 numpy>=1.24.0
 opencv-python-headless>=4.8.0
 python-multipart>=0.0.6
 aiofiles>=23.1.0
 gunicorn>=20.1.0
+a2wsgi>=1.10.0

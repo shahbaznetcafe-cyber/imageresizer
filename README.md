@@ -103,10 +103,15 @@ If you create the backend manually instead of using the Blueprint, use these set
 
 - Service type: `Web Service`
 - Runtime/language: `Python`
+- Python version: `3.13.5`
 - Build command: `pip install -r requirements.txt`
 - Start command: `python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
 
 If Render logs show `Running build command 'yarn'` or `Running 'gunicorn --bind 0.0.0.0:$PORT wsgi:app'`, the service is using the wrong settings. Change it to the Python settings above, then redeploy.
+
+If Render logs show `No onnxruntime backend found`, make sure the latest code is deployed. The backend uses `rembg[cpu]` so `onnxruntime` is installed for background removal.
+
+The repository also includes a root `wsgi.py` compatibility entry so Render's default `gunicorn --bind 0.0.0.0:$PORT wsgi:app` command can boot the FastAPI app. The `uvicorn` start command above is still recommended.
 
 ---
 
