@@ -2,7 +2,10 @@ fastapi>=0.100.0
 uvicorn>=0.22.0
 pillow>=10.0.0
 rembg[cpu]>=2.0.76
-numpy>=1.24.0
+numpy==1.26.4
+scipy==1.13.1
+numba==0.60.0
+llvmlite==0.43.0
 opencv-python-headless>=4.8.0
 python-multipart>=0.0.6
 aiofiles>=23.1.0

@@ -159,7 +159,7 @@ For a separate Vercel backend project:
 - Build Command: `pip install -r requirements.txt`
 - Output Directory: leave blank
 - Install Command: leave blank
-- Environment Variable: `PYTHON_VERSION=3.13.5`
+- Environment Variable: `PYTHON_VERSION=3.12.7`
 - Environment Variable: `PRELOAD_REMBG_MODEL=0`
 
 After the backend deploys, set the frontend project's `VITE_API_URL` to the backend Vercel URL and redeploy the frontend.
