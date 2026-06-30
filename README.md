@@ -103,7 +103,7 @@ If you create the backend manually instead of using the Blueprint, use these set
 
 - Service type: `Web Service`
 - Runtime/language: `Python`
-- Python version: `3.12.7`
+- Python version: `3.12`
 - Build command: `pip install -r requirements.txt`
 - Start command: `python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
 
@@ -159,7 +159,7 @@ For a separate Vercel backend project:
 - Build Command: `pip install -r requirements.txt`
 - Output Directory: leave blank
 - Install Command: leave blank
-- Environment Variable: `PYTHON_VERSION=3.12.7`
+- Environment Variable: `PYTHON_VERSION=3.12`
 - Environment Variable: `PRELOAD_REMBG_MODEL=0`
 - Environment Variable: `REMBG_MODEL=u2netp`
 
