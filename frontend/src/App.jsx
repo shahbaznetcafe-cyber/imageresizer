@@ -104,7 +104,7 @@ export default function App() {
 
       const data = await response.json();
       setResults(data.images);
-      setZipUrl(data.zip_url);
+      setZipUrl(data.zip_data_url || data.zip_url);
       
       // Update local session processed count
       setSession(prev => {

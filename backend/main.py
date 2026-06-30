@@ -1,3 +1,4 @@
+import base64
 import os
 import tempfile
 import uuid
@@ -260,6 +261,7 @@ async def api_process_images(
                 "original_name": filename,
                 "processed_name": processed_filename,
                 "url": f"/processed/{processed_filename}",
+                "data_url": f"data:image/jpeg;base64,{base64.b64encode(processed_data).decode('ascii')}",
                 "size_kb": round(len(processed_data) / 1024, 2)
             })
             
@@ -283,6 +285,7 @@ async def api_process_images(
             
     # 4. Generate ZIP if multiple images
     zip_url = None
+    zip_data_url = None
     if len(processed_images) > 1:
         zip_id = str(uuid.uuid4())
         zip_filename = f"sed_punjab_{session['emis_code']}_{zip_id}.zip"
@@ -297,6 +300,11 @@ async def api_process_images(
                     zipf.write(img_path, arcname=name_in_zip)
                     
             zip_url = f"/processed/{zip_filename}"
+            with open(zip_path, "rb") as zip_file:
+                zip_data_url = (
+                    "data:application/zip;base64,"
+                    + base64.b64encode(zip_file.read()).decode("ascii")
+                )
         except Exception as e:
             print(f"Error creating ZIP: {e}")
             # Non-fatal error: user can still download individually
@@ -311,5 +319,6 @@ async def api_process_images(
         "total_session_count": new_count,
         "images": processed_images,
         "zip_url": zip_url,
+        "zip_data_url": zip_data_url,
         "activity": get_activity_summary()
     }
