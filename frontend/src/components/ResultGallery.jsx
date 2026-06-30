@@ -1,13 +1,12 @@
 import React from 'react';
 import { Download, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react';
+import { getApiUrl } from '../utils/api';
 
 export default function ResultGallery({ results, zipUrl, onReset }) {
-  const baseUrl = import.meta.env.VITE_API_URL || '';
-
   const handleDownload = (url, name) => {
     // Force download by creating a temporary link
     const link = document.createElement('a');
-    link.href = `${baseUrl}${url}`;
+    link.href = getApiUrl(url);
     link.download = name || 'processed_photo.jpg';
     document.body.appendChild(link);
     link.click();
@@ -58,7 +57,7 @@ export default function ResultGallery({ results, zipUrl, onReset }) {
               {/* Image Preview Container */}
               <div className="relative aspect-[3/4] bg-slate-100 flex items-center justify-center p-2 border-b border-slate-100">
                 <img
-                  src={`${baseUrl}${img.url}`}
+                  src={getApiUrl(img.url)}
                   alt={img.original_name}
                   className="w-full h-full object-contain bg-white rounded-lg shadow-sm border border-slate-200"
                 />

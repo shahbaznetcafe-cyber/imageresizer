@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { School, Phone, ArrowRight, Loader2, Images, History } from 'lucide-react';
 import { getApiErrorMessage, getNetworkErrorMessage } from '../utils/apiErrors';
+import { getApiUrl } from '../utils/api';
 
 export default function LoginRecordForm({ onLoginSuccess }) {
   const [emisCode, setEmisCode] = useState('');
@@ -14,8 +15,7 @@ export default function LoginRecordForm({ onLoginSuccess }) {
 
     const loadActivity = async () => {
       try {
-        const baseUrl = import.meta.env.VITE_API_URL || '';
-        const response = await fetch(`${baseUrl}/api/activity`);
+        const response = await fetch(getApiUrl('/api/activity'));
         if (!response.ok) return;
         const data = await response.json();
         if (isMounted) {
@@ -67,8 +67,7 @@ export default function LoginRecordForm({ onLoginSuccess }) {
       formData.append('phone_number', phoneNumber);
 
       // Determine backend API URL (runs on the same host or relative in production, fallback to local)
-      const baseUrl = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${baseUrl}/api/session`, {
+      const response = await fetch(getApiUrl('/api/session'), {
         method: 'POST',
         body: formData,
       });

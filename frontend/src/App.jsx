@@ -7,6 +7,7 @@ import ProcessingStatus from './components/ProcessingStatus';
 import ResultGallery from './components/ResultGallery';
 import FooterBranding from './components/FooterBranding';
 import { getApiErrorMessage, getNetworkErrorMessage } from './utils/apiErrors';
+import { getApiUrl } from './utils/api';
 
 export default function App() {
   const [step, setStep] = useState('login'); // 'login', 'upload', 'crop', 'processing', 'result'
@@ -41,8 +42,7 @@ export default function App() {
     });
 
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${baseUrl}/api/process-images`, {
+      const response = await fetch(getApiUrl('/api/process-images'), {
         method: 'POST',
         body: formData,
       });
