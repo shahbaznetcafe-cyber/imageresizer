@@ -45,7 +45,7 @@ def _connect_postgres():
     from psycopg import connect
     from psycopg.rows import dict_row
 
-    return connect(DATABASE_URL, row_factory=dict_row)
+    return connect(DATABASE_URL, row_factory=dict_row, prepare_threshold=0)
 
 
 def _connect():
