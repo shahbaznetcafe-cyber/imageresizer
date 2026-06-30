@@ -1,9 +1,33 @@
 import io
 import os
+import tempfile
 from functools import lru_cache
 from math import ceil
 from typing import Optional
 from PIL import Image, ImageFilter, ImageOps
+
+
+def configure_writable_runtime_cache():
+    """Point model/cache libraries at /tmp on read-only serverless hosts."""
+    if not os.getenv("VERCEL"):
+        return
+
+    runtime_root = os.path.join(tempfile.gettempdir(), "pectaa_runtime")
+    cache_root = os.path.join(runtime_root, "cache")
+    paths = {
+        "HOME": runtime_root,
+        "XDG_CACHE_HOME": cache_root,
+        "U2NET_HOME": os.path.join(runtime_root, "u2net"),
+        "NUMBA_CACHE_DIR": os.path.join(cache_root, "numba"),
+        "MPLCONFIGDIR": os.path.join(cache_root, "matplotlib"),
+    }
+
+    for key, path in paths.items():
+        os.environ[key] = path
+        os.makedirs(path, exist_ok=True)
+
+
+configure_writable_runtime_cache()
 
 PROCESS_MAX_DIM = int(os.getenv("PROCESS_MAX_DIM", "960"))
 REMBG_MODEL = os.getenv("REMBG_MODEL", "u2net")
