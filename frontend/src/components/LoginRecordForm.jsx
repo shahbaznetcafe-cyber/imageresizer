@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { School, Phone, ArrowRight, Loader2, Images, History } from 'lucide-react';
+import { School, Phone, ArrowRight, Loader2, History } from 'lucide-react';
 import { getApiErrorMessage, getNetworkErrorMessage } from '../utils/apiErrors';
 import { getApiUrl } from '../utils/api';
 
@@ -9,6 +9,20 @@ export default function LoginRecordForm({ onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activity, setActivity] = useState(null);
+
+  const formatDate = (value) => {
+    if (!value) return '';
+    try {
+      return new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(value));
+    } catch {
+      return '';
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -139,7 +153,7 @@ export default function LoginRecordForm({ onLoginSuccess }) {
               <Phone size={14} className="text-punjab-green" />
               Operator Phone Number
             </span>
-            <span className="urdu-text text-[11px] leading-3 text-slate-400">فون نمبر (مثال: 0300-xxxxxxx)</span>
+            <span dir="rtl" className="urdu-text text-[11px] leading-3 text-slate-400 text-right">فون نمبر (مثال: 0300-xxxxxxx)</span>
           </div>
           <div className="relative mt-1">
             <input
@@ -199,26 +213,29 @@ export default function LoginRecordForm({ onLoginSuccess }) {
             <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
               <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                 <History size={14} className="text-punjab-blue" />
-                Live Edited Images
+                Recent Schools
               </p>
-              <p className="urdu-text text-[10px] leading-3 text-slate-400">تازہ ریکارڈ</p>
+              <p dir="rtl" className="urdu-text text-[10px] leading-3 text-slate-400 text-right">حالیہ سکولز</p>
             </div>
 
-            {activity.recent_images?.length > 0 ? (
+            {activity.recent_sessions?.length > 0 ? (
               <div className="divide-y divide-slate-100">
-                {activity.recent_images.slice(0, 3).map((item, index) => (
+                {activity.recent_sessions.slice(0, 3).map((item, index) => (
                   <div key={`${item.emis_code}-${item.created_at}-${index}`} className="py-2 flex items-center gap-2 text-xs">
-                    <Images size={14} className="text-punjab-green shrink-0" />
+                    <School size={14} className="text-punjab-green shrink-0" />
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-slate-700 truncate">{item.original_name}</p>
-                      <p className="text-[10px] text-slate-400">EMIS {item.emis_code} · {item.size_kb} KB</p>
+                      <p className="font-semibold text-slate-700 truncate">EMIS {item.emis_code}</p>
+                      <p className="text-[10px] text-slate-400">
+                        {item.processed_count || 0} photos created
+                        {formatDate(item.created_at) ? ` · ${formatDate(item.created_at)}` : ''}
+                      </p>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
               <p className="text-[11px] text-slate-400 py-3 text-center">
-                No edited images recorded yet.
+                No school activity recorded yet.
               </p>
             )}
           </div>
