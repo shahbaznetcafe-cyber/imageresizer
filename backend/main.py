@@ -19,6 +19,7 @@ try:
         get_session,
         record_processed_images,
         update_processed_count,
+        DATABASE_BACKEND,
     )
     from .image_processor import process_single_image, warm_image_processor
 except ImportError:
@@ -29,6 +30,7 @@ except ImportError:
         get_session,
         record_processed_images,
         update_processed_count,
+        DATABASE_BACKEND,
     )
     from image_processor import process_single_image, warm_image_processor
 
@@ -98,7 +100,8 @@ def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "database": "connected"
+        "database": "connected",
+        "database_backend": DATABASE_BACKEND
     }
 
 @app.post("/api/session")

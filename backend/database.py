@@ -9,8 +9,14 @@ DEFAULT_DATABASE_FILE = (
     if os.getenv("VERCEL")
     else "school_sessions.db"
 )
-DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DATABASE_FILE)
+DATABASE_URL = (
+    os.getenv("DATABASE_URL")
+    or os.getenv("POSTGRES_URL")
+    or os.getenv("SUPABASE_DB_URL")
+    or DEFAULT_DATABASE_FILE
+)
 IS_POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
+DATABASE_BACKEND = "supabase_postgres" if IS_POSTGRES else "sqlite"
 
 
 def _json_safe(value):
