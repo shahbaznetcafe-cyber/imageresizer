@@ -161,5 +161,6 @@ For a separate Vercel backend project:
 - Install Command: leave blank
 - Environment Variable: `PYTHON_VERSION=3.12.7`
 - Environment Variable: `PRELOAD_REMBG_MODEL=0`
+- Environment Variable: `REMBG_MODEL=u2netp`
 
 After the backend deploys, set the frontend project's `VITE_API_URL` to the backend Vercel URL and redeploy the frontend.
