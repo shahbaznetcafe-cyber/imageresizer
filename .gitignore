@@ -29,3 +29,6 @@ frontend/.env.local
 Thumbs.db
 .vscode/
 .idea/
+
+# Local packaged builds
+*.zip
