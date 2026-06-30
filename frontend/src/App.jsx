@@ -40,6 +40,51 @@ function clearCachedSession() {
   window.localStorage.removeItem(SESSION_CACHE_KEY);
 }
 
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(url, options, config = {}) {
+  const {
+    retries = 1,
+    timeoutMs = 180000,
+    retryStatuses = [502, 503, 504],
+  } = config;
+
+  let lastError;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+
+      window.clearTimeout(timer);
+
+      if (!retryStatuses.includes(response.status) || attempt === retries) {
+        return response;
+      }
+
+      await wait(1500 + attempt * 1500);
+    } catch (error) {
+      window.clearTimeout(timer);
+      lastError = error;
+
+      if (attempt === retries) {
+        throw error;
+      }
+
+      await wait(1500 + attempt * 1500);
+    }
+  }
+
+  throw lastError || new Error('Request failed. Please try again.');
+}
+
 function warmBackendProcessor() {
   fetch(getApiUrl('/api/warmup'), {
     method: 'POST',
@@ -93,10 +138,17 @@ export default function App() {
     });
 
     try {
-      const response = await fetch(getApiUrl('/api/process-images'), {
-        method: 'POST',
-        body: formData,
-      });
+      const response = await fetchWithRetry(
+        getApiUrl('/api/process-images'),
+        {
+          method: 'POST',
+          body: formData,
+        },
+        {
+          retries: 1,
+          timeoutMs: 180000,
+        }
+      );
 
       if (!response.ok) {
         throw new Error(await getApiErrorMessage(response, 'Processing failed. Please check backend connection.'));

@@ -1,6 +1,84 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Coffee, Download, CheckCircle2, RotateCcw, AlertTriangle, X } from 'lucide-react';
 import { getApiUrl } from '../utils/api';
+
+function getRetryUrl(url, retryCount) {
+  if (!url || /^data:/i.test(url) || retryCount === 0) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}preview_retry=${retryCount}&t=${Date.now()}`;
+}
+
+function ImagePreview({ image, getAssetUrl }) {
+  const sources = useMemo(() => {
+    return [image.data_url, image.url]
+      .filter(Boolean)
+      .map(getAssetUrl)
+      .filter((value, index, list) => value && list.indexOf(value) === index);
+  }, [getAssetUrl, image.data_url, image.url]);
+
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(Boolean(sources.length));
+  const [hasFailed, setHasFailed] = useState(!sources.length);
+
+  useEffect(() => {
+    setSourceIndex(0);
+    setRetryCount(0);
+    setIsLoading(Boolean(sources.length));
+    setHasFailed(!sources.length);
+  }, [sources]);
+
+  const source = getRetryUrl(sources[sourceIndex], retryCount);
+
+  const handleError = () => {
+    if (retryCount < 3 && sources[sourceIndex] && !/^data:/i.test(sources[sourceIndex])) {
+      window.setTimeout(() => {
+        setRetryCount((current) => current + 1);
+        setIsLoading(true);
+      }, 700 + retryCount * 500);
+      return;
+    }
+
+    if (sourceIndex < sources.length - 1) {
+      setSourceIndex((current) => current + 1);
+      setRetryCount(0);
+      setIsLoading(true);
+      return;
+    }
+
+    setIsLoading(false);
+    setHasFailed(true);
+  };
+
+  return (
+    <div className="relative h-full w-full rounded-lg bg-white border border-slate-200 shadow-sm overflow-hidden">
+      {source && !hasFailed && (
+        <img
+          src={source}
+          alt=""
+          onLoad={() => setIsLoading(false)}
+          onError={handleError}
+          className={`w-full h-full object-contain transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+        />
+      )}
+
+      {isLoading && !hasFailed && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white text-slate-400 text-xs font-semibold">
+          <div className="h-6 w-6 rounded-full border-2 border-punjab-blue/20 border-t-punjab-blue animate-spin" />
+          <span>Loading preview...</span>
+        </div>
+      )}
+
+      {hasFailed && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white px-4 text-center">
+          <AlertTriangle size={22} className="text-amber-500" />
+          <p className="text-xs font-bold text-slate-600">Preview retry failed</p>
+          <p className="text-[10px] text-slate-400">Download button still works for saved output.</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ResultGallery({ results, zipUrl, onReset }) {
   const [showDonateDialog, setShowDonateDialog] = useState(false);
@@ -22,6 +100,16 @@ export default function ResultGallery({ results, zipUrl, onReset }) {
 
   return (
     <div className="w-full max-w-3xl mx-auto space-y-6">
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowDonateDialog(true)}
+          className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-5 rounded-xl shadow-lg hover:shadow-xl transition-all-custom flex items-center justify-center gap-2 text-sm"
+        >
+          <Coffee size={18} />
+          <span>☕ Donate a Coffee</span>
+        </button>
+      </div>
+
       {/* Header Banner */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-xl p-6 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left justify-between">
         <div className="flex items-center gap-3">
@@ -43,7 +131,7 @@ export default function ResultGallery({ results, zipUrl, onReset }) {
             className="w-full sm:w-auto bg-white hover:bg-amber-50 text-amber-700 border border-amber-200 font-bold py-3.5 px-5 rounded-xl shadow-sm hover:shadow-md transition-all-custom flex items-center justify-center gap-2 text-sm"
           >
             <Coffee size={18} />
-            <span>Donate a Coffee</span>
+            <span>☕ Donate a Coffee</span>
           </button>
 
           {zipUrl && (
@@ -81,6 +169,10 @@ export default function ResultGallery({ results, zipUrl, onReset }) {
             </div>
 
             <div className="p-5 space-y-3">
+              <div className="rounded-xl bg-amber-50 border border-amber-100 p-4">
+                <p className="text-[10px] uppercase font-bold text-amber-600">Account Title</p>
+                <p className="text-base font-bold text-slate-800 mt-1">Muhammad Shahbaz Zafar</p>
+              </div>
               <div className="rounded-xl bg-slate-50 border border-slate-100 p-4">
                 <p className="text-[10px] uppercase font-bold text-slate-400">Jazz Cash</p>
                 <p className="text-xl font-bold text-slate-800 font-mono mt-1">03007673394</p>
@@ -106,11 +198,7 @@ export default function ResultGallery({ results, zipUrl, onReset }) {
             >
               {/* Image Preview Container */}
               <div className="relative aspect-[3/4] bg-slate-100 flex items-center justify-center p-2 border-b border-slate-100">
-                <img
-                  src={getAssetUrl(img.data_url || img.url)}
-                  alt={img.original_name}
-                  className="w-full h-full object-contain bg-white rounded-lg shadow-sm border border-slate-200"
-                />
+                <ImagePreview image={img} getAssetUrl={getAssetUrl} />
                 
                 {/* Size Badge */}
                 <div className={`absolute bottom-4 right-4 px-2.5 py-1 rounded-full text-xs font-mono font-bold text-white shadow-sm flex items-center gap-1 ${
@@ -137,7 +225,7 @@ export default function ResultGallery({ results, zipUrl, onReset }) {
                 </div>
 
                 <button
-                  onClick={() => handleDownload(img.url, img.original_name)}
+                  onClick={() => handleDownload(img.data_url || img.url, img.original_name)}
                   className="w-full flex items-center justify-center gap-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 text-slate-700 font-semibold py-2.5 px-4 rounded-xl text-xs transition-colors"
                 >
                   <Download size={14} className="text-punjab-blue" />

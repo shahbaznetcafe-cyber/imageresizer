@@ -51,7 +51,7 @@ export default function ProcessingStatus() {
       </div>
 
       <div className="text-xs text-slate-400 font-medium">
-        Please do not close this window. Processing up to 10 images with background removal can take up to 20-30 seconds.
+        Please do not close this window. Larger batches can take up to 60-90 seconds while the server prepares each image.
       </div>
     </div>
   );
