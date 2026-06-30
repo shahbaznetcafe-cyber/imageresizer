@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { School, LogOut, Check } from 'lucide-react';
 import LoginRecordForm from './components/LoginRecordForm';
 import UploadArea from './components/UploadArea';
@@ -9,6 +9,46 @@ import FooterBranding from './components/FooterBranding';
 import { getApiErrorMessage, getNetworkErrorMessage } from './utils/apiErrors';
 import { getApiUrl } from './utils/api';
 
+const SESSION_CACHE_KEY = 'pectaa-session-cache';
+const SESSION_CACHE_MS = 2 * 60 * 60 * 1000;
+
+function loadCachedSession() {
+  try {
+    const cached = JSON.parse(window.localStorage.getItem(SESSION_CACHE_KEY) || 'null');
+    if (!cached?.session || !cached?.expiresAt || cached.expiresAt <= Date.now()) {
+      window.localStorage.removeItem(SESSION_CACHE_KEY);
+      return null;
+    }
+    return cached.session;
+  } catch {
+    window.localStorage.removeItem(SESSION_CACHE_KEY);
+    return null;
+  }
+}
+
+function storeCachedSession(sessionData) {
+  window.localStorage.setItem(
+    SESSION_CACHE_KEY,
+    JSON.stringify({
+      session: sessionData,
+      expiresAt: Date.now() + SESSION_CACHE_MS,
+    })
+  );
+}
+
+function clearCachedSession() {
+  window.localStorage.removeItem(SESSION_CACHE_KEY);
+}
+
+function warmBackendProcessor() {
+  fetch(getApiUrl('/api/warmup'), {
+    method: 'POST',
+    keepalive: true,
+  }).catch(() => {
+    // Warmup is only a speed boost; the main workflow can continue without it.
+  });
+}
+
 export default function App() {
   const [step, setStep] = useState('login'); // 'login', 'upload', 'crop', 'processing', 'result'
   const [session, setSession] = useState(null);
@@ -18,8 +58,19 @@ export default function App() {
   const [zipUrl, setZipUrl] = useState(null);
   const [error, setError] = useState(null);
 
+  useEffect(() => {
+    const cachedSession = loadCachedSession();
+    if (cachedSession) {
+      setSession(cachedSession);
+      setStep('upload');
+      warmBackendProcessor();
+    }
+  }, []);
+
   const handleLoginSuccess = (sessionData) => {
     setSession(sessionData);
+    storeCachedSession(sessionData);
+    warmBackendProcessor();
     setStep('upload');
   };
 
@@ -56,10 +107,14 @@ export default function App() {
       setZipUrl(data.zip_url);
       
       // Update local session processed count
-      setSession(prev => ({
-        ...prev,
-        processed_count: data.total_session_count
-      }));
+      setSession(prev => {
+        const updatedSession = {
+          ...prev,
+          processed_count: data.total_session_count
+        };
+        storeCachedSession(updatedSession);
+        return updatedSession;
+      });
       
       setStep('result');
     } catch (err) {
@@ -69,6 +124,12 @@ export default function App() {
         en: message,
         ur: message
       });
+      if (/session expired/i.test(message)) {
+        clearCachedSession();
+        setSession(null);
+        setStep('login');
+        return;
+      }
       setStep('upload'); // bounce back to upload so they can retry
     }
   };
@@ -88,6 +149,7 @@ export default function App() {
 
   const handleLogout = () => {
     handleReset();
+    clearCachedSession();
     setSession(null);
     setStep('login');
   };

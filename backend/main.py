@@ -36,6 +36,7 @@ except ImportError:
 
 # Initialize FastAPI application
 app = FastAPI(title="PECTAA Image Resizer API")
+SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "2"))
 
 # Configure CORS
 origins = [
@@ -71,17 +72,18 @@ app.mount("/processed", StaticFiles(directory=PROCESSED_DIR), name="processed")
 @app.on_event("startup")
 def startup_event():
     init_db()
-    if os.getenv("PRELOAD_REMBG_MODEL", "1").lower() in {"1", "true", "yes", "on"}:
+    default_preload = "0" if os.getenv("VERCEL") else "1"
+    if os.getenv("PRELOAD_REMBG_MODEL", default_preload).lower() in {"1", "true", "yes", "on"}:
         try:
             warm_image_processor()
         except Exception as e:
             print(f"Background-removal model preload failed: {e}")
 
-# Helper function to delete old files (older than 1 hour)
+# Helper function to delete old files after the session window.
 def cleanup_old_files():
-    """Removes files in PROCESSED_DIR that are older than 1 hour to free disk space."""
+    """Removes files in PROCESSED_DIR that are older than the session window."""
     now = datetime.now()
-    threshold = now - timedelta(hours=1)
+    threshold = now - timedelta(hours=SESSION_TTL_HOURS)
     
     for filename in os.listdir(PROCESSED_DIR):
         file_path = os.path.join(PROCESSED_DIR, filename)
@@ -103,6 +105,27 @@ def health_check():
         "database": "connected",
         "database_backend": DATABASE_BACKEND
     }
+
+
+@app.post("/api/warmup")
+def api_warmup(background_tasks: BackgroundTasks):
+    """Starts model loading early so image processing is faster after login."""
+    background_tasks.add_task(warm_image_processor)
+    return {"status": "warming"}
+
+
+def is_session_expired(session: dict) -> bool:
+    created_at = session.get("created_at")
+    if not created_at:
+        return False
+
+    if isinstance(created_at, str):
+        created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+
+    if created_at.tzinfo is not None:
+        created_at = created_at.replace(tzinfo=None)
+
+    return datetime.utcnow() - created_at > timedelta(hours=SESSION_TTL_HOURS)
 
 @app.post("/api/session")
 def api_create_session(
@@ -158,11 +181,11 @@ async def api_process_images(
     """
     # 1. Validate Session ID
     session = get_session(session_id)
-    if not session:
+    if not session or is_session_expired(session):
         raise HTTPException(
             status_code=404,
             detail={
-                "en": "Session not found. Please log in again.",
+                "en": "Session expired. Please log in again.",
                 "ur": "سیشن نہیں ملا۔ براہ کرم دوبارہ لاگ ان کریں۔"
             }
         )
