@@ -1,4 +1,5 @@
 import os
+import tempfile
 import uuid
 import zipfile
 from typing import List
@@ -51,8 +52,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ensure processed files directory exists
-PROCESSED_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "processed_temp")
+# Ensure processed files directory exists. Vercel's code directory is read-only,
+# so temporary processed files must live under /tmp there.
+PROCESSED_DIR = os.getenv(
+    "PROCESSED_DIR",
+    os.path.join(tempfile.gettempdir(), "processed_temp")
+    if os.getenv("VERCEL")
+    else os.path.join(os.path.dirname(os.path.abspath(__file__)), "processed_temp")
+)
 os.makedirs(PROCESSED_DIR, exist_ok=True)
 
 # Mount static files to serve processed images

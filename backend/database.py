@@ -1,8 +1,14 @@
 import os
 import sqlite3
+import tempfile
 from datetime import datetime
 
-DATABASE_FILE = os.getenv("DATABASE_URL", "school_sessions.db")
+DEFAULT_DATABASE_FILE = (
+    os.path.join(tempfile.gettempdir(), "school_sessions.db")
+    if os.getenv("VERCEL")
+    else "school_sessions.db"
+)
+DATABASE_FILE = os.getenv("DATABASE_URL", DEFAULT_DATABASE_FILE)
 
 
 def _connect():
