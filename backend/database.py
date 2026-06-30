@@ -45,7 +45,7 @@ def _connect_postgres():
     from psycopg import connect
     from psycopg.rows import dict_row
 
-    return connect(DATABASE_URL, row_factory=dict_row, prepare_threshold=0)
+    return connect(DATABASE_URL, row_factory=dict_row, prepare_threshold=None)
 
 
 def _connect():
@@ -285,7 +285,7 @@ def get_activity_summary(limit: int = 8) -> dict:
     cursor.execute("SELECT COUNT(DISTINCT emis_code) AS total_schools FROM school_sessions")
     total_schools = _row_to_dict(cursor.fetchone())["total_schools"]
 
-    cursor.execute("SELECT COALESCE(SUM(processed_count), 0) AS total_images FROM school_sessions")
+    cursor.execute("SELECT COUNT(*) AS total_images FROM processed_images")
     total_images = _row_to_dict(cursor.fetchone())["total_images"]
 
     cursor.execute(
@@ -301,9 +301,15 @@ def get_activity_summary(limit: int = 8) -> dict:
 
     cursor.execute(
         f"""
-        SELECT emis_code, processed_count, created_at
+        SELECT
+            school_sessions.emis_code,
+            COUNT(processed_images.id) AS processed_count,
+            school_sessions.created_at
         FROM school_sessions
-        ORDER BY created_at DESC, id DESC
+        LEFT JOIN processed_images
+            ON processed_images.session_id = school_sessions.id
+        GROUP BY school_sessions.id, school_sessions.emis_code, school_sessions.created_at
+        ORDER BY school_sessions.created_at DESC, school_sessions.id DESC
         LIMIT {limit_placeholder}
         """,
         (limit,),
