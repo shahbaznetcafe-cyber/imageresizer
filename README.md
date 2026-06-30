@@ -148,3 +148,18 @@ For Vercel, deploy the **frontend**:
 Vercel hosts only the frontend. Login, school records, image processing, and dashboard activity require the FastAPI backend to be live and connected through `VITE_API_URL`.
 
 The FastAPI backend is better hosted on Render, Railway, Fly.io, or another Python web-service host. Vercel serverless functions are not ideal for this backend because `rembg`/ONNX model loading is large, cold starts can be slow, and processed image files are temporary.
+
+### Optional Vercel Backend Settings
+
+The repository includes `api/index.py` and `vercel.json` so Vercel can route backend API requests to the FastAPI app.
+
+For a separate Vercel backend project:
+
+- Root Directory: `./`
+- Build Command: `pip install -r requirements.txt`
+- Output Directory: leave blank
+- Install Command: leave blank
+- Environment Variable: `PYTHON_VERSION=3.13.5`
+- Environment Variable: `PRELOAD_REMBG_MODEL=0`
+
+After the backend deploys, set the frontend project's `VITE_API_URL` to the backend Vercel URL and redeploy the frontend.
