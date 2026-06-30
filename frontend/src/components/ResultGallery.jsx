@@ -18,13 +18,11 @@ function ImagePreview({ image, getAssetUrl }) {
 
   const [sourceIndex, setSourceIndex] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(Boolean(sources.length));
   const [hasFailed, setHasFailed] = useState(!sources.length);
 
   useEffect(() => {
     setSourceIndex(0);
     setRetryCount(0);
-    setIsLoading(Boolean(sources.length));
     setHasFailed(!sources.length);
   }, [sources]);
 
@@ -34,7 +32,6 @@ function ImagePreview({ image, getAssetUrl }) {
     if (retryCount < 3 && sources[sourceIndex] && !/^data:/i.test(sources[sourceIndex])) {
       window.setTimeout(() => {
         setRetryCount((current) => current + 1);
-        setIsLoading(true);
       }, 700 + retryCount * 500);
       return;
     }
@@ -42,11 +39,9 @@ function ImagePreview({ image, getAssetUrl }) {
     if (sourceIndex < sources.length - 1) {
       setSourceIndex((current) => current + 1);
       setRetryCount(0);
-      setIsLoading(true);
       return;
     }
 
-    setIsLoading(false);
     setHasFailed(true);
   };
 
@@ -56,17 +51,9 @@ function ImagePreview({ image, getAssetUrl }) {
         <img
           src={source}
           alt=""
-          onLoad={() => setIsLoading(false)}
           onError={handleError}
-          className={`w-full h-full object-contain transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+          className="w-full h-full object-contain bg-white"
         />
-      )}
-
-      {isLoading && !hasFailed && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white text-slate-400 text-xs font-semibold">
-          <div className="h-6 w-6 rounded-full border-2 border-punjab-blue/20 border-t-punjab-blue animate-spin" />
-          <span>Loading preview...</span>
-        </div>
       )}
 
       {hasFailed && (
