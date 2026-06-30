@@ -188,7 +188,7 @@ export default function UploadArea({ onFilesSelected }) {
                 <span className="text-sm font-semibold tracking-wide flex items-center gap-1.5">
                   Proceed to Crop & Preview <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                 </span>
-                <span className="urdu-text text-[10px] leading-3 text-white/80 font-normal">فصل اور پیش نظارہ پر جائیں</span>
+                <span className="urdu-text text-[10px] leading-3 text-white/80 font-normal">کراپ اور پریویو پر جائیں</span>
               </div>
             </button>
           </div>
