@@ -227,7 +227,7 @@ export default function App() {
             <div>
               <h1 className="text-xl font-bold tracking-tight text-slate-800">PECTAA Image Resizer</h1>
               <p className="text-[10px] uppercase font-bold text-punjab-green tracking-wider leading-none mt-0.5">
-                Official Government Size (600x800 px)
+                Powered by SBZ Tech
               </p>
             </div>
           </div>
