@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { HeartHandshake, Download, CheckCircle2, RotateCcw, AlertTriangle, X } from 'lucide-react';
+import { Download, CheckCircle2, RotateCcw, AlertTriangle, ExternalLink, Sparkles } from 'lucide-react';
 import { getApiUrl } from '../utils/api';
 
 function getRetryUrl(url, retryCount) {
@@ -68,7 +68,6 @@ function ImagePreview({ image, getAssetUrl }) {
 }
 
 export default function ResultGallery({ results = [], failedImages = [], zipUrl, onReset }) {
-  const [showDonateDialog, setShowDonateDialog] = useState(false);
   const hasResults = results.length > 0;
   const hasFailures = failedImages.length > 0;
   const headerTitle = hasResults && hasFailures
@@ -96,13 +95,16 @@ export default function ResultGallery({ results = [], failedImages = [], zipUrl,
   return (
     <div className="w-full max-w-3xl mx-auto space-y-6">
       <div className="flex justify-end">
-        <button
-          onClick={() => setShowDonateDialog(true)}
-          className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-5 rounded-xl shadow-lg hover:shadow-xl transition-all-custom flex items-center justify-center gap-2 text-sm"
+        <a
+          href="https://shahbaznetcafe.com"
+          target="_blank"
+          rel="noreferrer"
+          className="bg-punjab-blue hover:bg-punjab-green text-white font-bold py-3 px-5 rounded-xl shadow-lg hover:shadow-xl transition-all-custom flex items-center justify-center gap-2 text-sm"
         >
-          <HeartHandshake size={18} />
-          <span>Help Keep This Tool Free</span>
-        </button>
+          <Sparkles size={18} />
+          <span>Explore More Free Tools</span>
+          <ExternalLink size={16} />
+        </a>
       </div>
 
       {/* Header Banner */}
@@ -125,14 +127,15 @@ export default function ResultGallery({ results = [], failedImages = [], zipUrl,
         </div>
         
         <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
-          <button
-            onClick={() => setShowDonateDialog(true)}
-            className="w-full sm:w-auto bg-white hover:bg-amber-50 text-amber-700 border border-amber-200 font-bold py-3.5 px-5 rounded-xl shadow-sm hover:shadow-md transition-all-custom flex items-center justify-center gap-2 text-sm"
+          <a
+            href="https://shahbaznetcafe.com"
+            target="_blank"
+            rel="noreferrer"
+            className="w-full sm:w-auto bg-white hover:bg-green-50 text-punjab-green border border-punjab-green/20 font-bold py-3.5 px-5 rounded-xl shadow-sm hover:shadow-md transition-all-custom flex items-center justify-center gap-2 text-sm"
           >
-            <HeartHandshake size={18} />
-            <span>Help Keep This Tool Free</span>
-          </button>
-
+            <ExternalLink size={18} />
+            <span>More SBZ Tools</span>
+          </a>
           {zipUrl && (
             <button
               onClick={() => handleDownload(zipUrl, 'sed_punjab_photos.zip')}
@@ -147,49 +150,6 @@ export default function ResultGallery({ results = [], failedImages = [], zipUrl,
           )}
         </div>
       </div>
-
-      {showDonateDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
-          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-amber-50 text-amber-700">
-                  <HeartHandshake size={20} />
-                </div>
-                <div>
-                  <h4 className="font-bold text-slate-800">Help Keep This Tool Free</h4>
-                  <p className="text-[11px] text-slate-400">Your support helps SBZ Tech maintain free school utilities.</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowDonateDialog(false)}
-                className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                aria-label="Close donation details"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-3">
-              <div className="rounded-xl bg-amber-50 border border-amber-100 p-4">
-                <p className="text-[10px] uppercase font-bold text-amber-600">Account Title</p>
-                <p className="text-base font-bold text-slate-800 mt-1">Muhammad Shahbaz Zafar</p>
-              </div>
-              <div className="rounded-xl bg-slate-50 border border-slate-100 p-4">
-                <p className="text-[10px] uppercase font-bold text-slate-400">Jazz Cash</p>
-                <p className="text-xl font-bold text-slate-800 font-mono mt-1">03007673394</p>
-              </div>
-              <div className="rounded-xl bg-slate-50 border border-slate-100 p-4">
-                <p className="text-[10px] uppercase font-bold text-slate-400">Easy Paisa</p>
-                <p className="text-xl font-bold text-slate-800 font-mono mt-1">03457942747</p>
-              </div>
-              <p className="text-[11px] text-center text-slate-400 font-medium">
-                Thank you for supporting SBZ Tech school tools.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {hasFailures && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
