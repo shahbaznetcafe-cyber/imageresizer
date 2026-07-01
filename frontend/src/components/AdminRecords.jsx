@@ -17,24 +17,26 @@ function formatDate(value) {
 
 function downloadCsv(rows) {
   const headers = [
-    'Session ID',
     'EMIS Code',
     'Phone Number',
-    'Created At',
+    'Sessions',
     'Images Recorded',
     'Session Count',
+    'First Session At',
+    'Last Session At',
     'Total Size KB',
     'Last Processed At',
   ];
 
   const escapeCell = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
   const body = rows.map((row) => [
-    row.id,
     row.emis_code,
     row.phone_number,
-    row.created_at,
+    row.session_count,
     row.images_recorded,
     row.session_processed_count,
+    row.first_session_at,
+    row.last_session_at,
     row.total_size_kb,
     row.last_processed_at,
   ].map(escapeCell).join(','));
@@ -57,7 +59,7 @@ export default function AdminRecords({ onBack }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const sessions = records?.sessions || [];
+  const schools = records?.schools || records?.sessions || [];
   const totals = useMemo(() => ([
     { label: 'Schools', value: records?.total_schools || 0 },
     { label: 'Sessions', value: records?.total_sessions || 0 },
@@ -113,10 +115,10 @@ export default function AdminRecords({ onBack }) {
               <ArrowLeft size={15} />
               Back
             </button>
-            {sessions.length > 0 && (
+            {schools.length > 0 && (
               <button
                 type="button"
-                onClick={() => downloadCsv(sessions)}
+                onClick={() => downloadCsv(schools)}
                 className="inline-flex items-center gap-2 rounded-xl bg-punjab-green px-4 py-2.5 text-xs font-bold text-white hover:bg-punjab-green-dark transition-colors"
               >
                 <Download size={15} />
@@ -172,23 +174,31 @@ export default function AdminRecords({ onBack }) {
                   <tr>
                     <th className="px-4 py-3 font-black">EMIS</th>
                     <th className="px-4 py-3 font-black">Phone</th>
+                    <th className="px-4 py-3 font-black">Sessions</th>
                     <th className="px-4 py-3 font-black">Photos</th>
-                    <th className="px-4 py-3 font-black">Created</th>
+                    <th className="px-4 py-3 font-black">First Session</th>
+                    <th className="px-4 py-3 font-black">Last Session</th>
                     <th className="px-4 py-3 font-black">Last Processed</th>
                     <th className="px-4 py-3 font-black">Size</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {sessions.map((row) => (
-                    <tr key={row.id} className="hover:bg-slate-50/70 transition-colors">
+                  {schools.map((row) => (
+                    <tr key={row.emis_code} className="hover:bg-slate-50/70 transition-colors">
                       <td className="px-4 py-3 font-mono font-bold text-slate-800">{row.emis_code}</td>
                       <td className="px-4 py-3 font-mono text-slate-700">{row.phone_number}</td>
+                      <td className="px-4 py-3">
+                        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-punjab-blue">
+                          {row.session_count || 0}
+                        </span>
+                      </td>
                       <td className="px-4 py-3">
                         <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-black text-punjab-green">
                           {row.images_recorded || row.session_processed_count || 0}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{formatDate(row.created_at)}</td>
+                      <td className="px-4 py-3 text-xs text-slate-500">{formatDate(row.first_session_at)}</td>
+                      <td className="px-4 py-3 text-xs text-slate-500">{formatDate(row.last_session_at)}</td>
                       <td className="px-4 py-3 text-xs text-slate-500">{formatDate(row.last_processed_at)}</td>
                       <td className="px-4 py-3 text-xs font-mono text-slate-500">
                         {Number(row.total_size_kb || 0).toFixed(2)} KB
@@ -199,7 +209,7 @@ export default function AdminRecords({ onBack }) {
               </table>
             </div>
 
-            {!sessions.length && (
+            {!schools.length && (
               <div className="px-5 py-8 text-center text-sm font-semibold text-slate-400">
                 No records found yet.
               </div>

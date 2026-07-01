@@ -327,7 +327,7 @@ def get_activity_summary(limit: int = 8) -> dict:
 
 
 def get_admin_records(limit: int = 500) -> dict:
-    """Returns private school/session records for the protected admin view."""
+    """Returns private school records grouped by unique EMIS code."""
     conn = _connect()
     cursor = conn.cursor()
     limit_placeholder = "%s" if IS_POSTGRES else "?"
@@ -343,35 +343,56 @@ def get_admin_records(limit: int = 500) -> dict:
 
     cursor.execute(
         f"""
+        WITH school_rollup AS (
+            SELECT
+                emis_code,
+                COUNT(*) AS session_count,
+                SUM(processed_count) AS session_processed_count,
+                MIN(created_at) AS first_session_at,
+                MAX(created_at) AS last_session_at
+            FROM school_sessions
+            GROUP BY emis_code
+        ),
+        image_rollup AS (
+            SELECT
+                emis_code,
+                COUNT(*) AS images_recorded,
+                COALESCE(SUM(size_kb), 0) AS total_size_kb,
+                MAX(created_at) AS last_processed_at
+            FROM processed_images
+            GROUP BY emis_code
+        )
         SELECT
-            school_sessions.id,
-            school_sessions.emis_code,
-            school_sessions.phone_number,
-            school_sessions.created_at,
-            school_sessions.processed_count AS session_processed_count,
-            COUNT(processed_images.id) AS images_recorded,
-            COALESCE(SUM(processed_images.size_kb), 0) AS total_size_kb,
-            MAX(processed_images.created_at) AS last_processed_at
-        FROM school_sessions
-        LEFT JOIN processed_images
-            ON processed_images.session_id = school_sessions.id
-        GROUP BY
-            school_sessions.id,
-            school_sessions.emis_code,
-            school_sessions.phone_number,
-            school_sessions.created_at,
-            school_sessions.processed_count
-        ORDER BY school_sessions.created_at DESC, school_sessions.id DESC
+            school_rollup.emis_code,
+            (
+                SELECT latest.phone_number
+                FROM school_sessions AS latest
+                WHERE latest.emis_code = school_rollup.emis_code
+                ORDER BY latest.created_at DESC, latest.id DESC
+                LIMIT 1
+            ) AS phone_number,
+            school_rollup.session_count,
+            COALESCE(school_rollup.session_processed_count, 0) AS session_processed_count,
+            school_rollup.first_session_at,
+            school_rollup.last_session_at,
+            COALESCE(image_rollup.images_recorded, 0) AS images_recorded,
+            COALESCE(image_rollup.total_size_kb, 0) AS total_size_kb,
+            image_rollup.last_processed_at
+        FROM school_rollup
+        LEFT JOIN image_rollup
+            ON image_rollup.emis_code = school_rollup.emis_code
+        ORDER BY school_rollup.last_session_at DESC, school_rollup.emis_code ASC
         LIMIT {limit_placeholder}
         """,
         (limit,),
     )
-    sessions = [_row_to_dict(row) for row in cursor.fetchall()]
+    schools = [_row_to_dict(row) for row in cursor.fetchall()]
 
     conn.close()
     return {
         "total_sessions": int(total_sessions or 0),
         "total_schools": int(total_schools or 0),
         "total_images": int(total_images or 0),
-        "sessions": sessions,
+        "schools": schools,
+        "sessions": schools,
     }
