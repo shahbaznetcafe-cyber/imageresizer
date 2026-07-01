@@ -231,7 +231,8 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-slate-800">PECTAA Image Resizer</h1>
-              <p className="text-[10px] uppercase font-bold text-punjab-green tracking-wider leading-none mt-0.5">
+              <p className="mt-0.5 inline-flex items-center gap-1.5 text-[10px] uppercase font-bold text-punjab-green tracking-wider leading-none">
+                <img src="/sbz-tech-icon.png" alt="" className="h-3.5 w-auto object-contain" />
                 Powered by SBZ Tech
               </p>
             </div>

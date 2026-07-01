@@ -13,11 +13,16 @@ export default function SBZTrafficStrip() {
     <section className="w-full px-4 pb-2">
       <div className="mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white/90 px-4 py-4 shadow-sm backdrop-blur">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="text-center md:text-left">
-            <p className="text-sm font-black text-slate-800">More school & office tools by SBZ Tech</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              Need software, forms, invoice tools, or CV services? Visit shahbaznetcafe.com.
-            </p>
+          <div className="flex flex-col items-center gap-3 text-center md:flex-row md:text-left">
+            <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-2 shadow-sm">
+              <img src="/sbz-tech-icon.png" alt="SBZ Tech" className="max-h-8 w-auto object-contain" />
+            </div>
+            <div>
+              <p className="text-sm font-black text-slate-800">More school & office tools by SBZ Tech</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Need software, forms, invoice tools, or CV services? Visit shahbaznetcafe.com.
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-2">

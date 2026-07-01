@@ -13,7 +13,7 @@ export default function FooterBranding() {
           </span>
           <span className="hidden sm:inline text-slate-300">|</span>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-punjab-green/20 bg-punjab-green/5 px-3 py-1 text-punjab-green font-bold">
-            <span className="h-1.5 w-1.5 rounded-full bg-punjab-green" />
+            <img src="/sbz-tech-icon.png" alt="" className="h-3.5 w-auto object-contain" />
             Powered by SBZ Tech
           </span>
           <span className="hidden sm:inline text-slate-300">|</span>
