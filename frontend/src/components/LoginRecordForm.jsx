@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { School, Phone, ArrowRight, Loader2, History } from 'lucide-react';
+import { School, Phone, ArrowRight, Loader2, History, LockKeyhole } from 'lucide-react';
 import { getApiErrorMessage, getNetworkErrorMessage } from '../utils/apiErrors';
 import { getApiUrl } from '../utils/api';
 
-export default function LoginRecordForm({ onLoginSuccess }) {
+export default function LoginRecordForm({ onLoginSuccess, onAdminOpen }) {
   const [emisCode, setEmisCode] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
@@ -243,7 +243,15 @@ export default function LoginRecordForm({ onLoginSuccess }) {
       )}
       
       <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-        <span>No password required</span>
+        <button
+          type="button"
+          onClick={onAdminOpen}
+          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 -ml-2 text-[11px] font-bold text-slate-500 hover:bg-white hover:text-punjab-blue transition-colors"
+          title="Admin records login"
+        >
+          <LockKeyhole size={12} />
+          Admin Login
+        </button>
         <span className="urdu-text text-[10px] leading-3">پاس ورڈ کی ضرورت نہیں ہے</span>
       </div>
     </div>

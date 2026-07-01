@@ -89,11 +89,9 @@ The app stores each login session and processed-image count in the backend datab
 
 1. Set `ADMIN_KEY` on the backend host to a strong private value.
 2. Redeploy the backend.
-3. Open the frontend URL with `#records`, for example:
-   ```text
-   https://pectaa.shahbaznetcafe.com/#records
-   ```
-4. Paste the same `ADMIN_KEY` into the admin form and click **Load Records**.
+3. Open the frontend login page.
+4. Click **Admin Login** at the bottom-left of the login card.
+5. Paste the same `ADMIN_KEY` into the admin form and click **Load Records**.
 
 The records page can export CSV with EMIS code, phone number, session date, and image counts.
 
