@@ -67,8 +67,16 @@ function ImagePreview({ image, getAssetUrl }) {
   );
 }
 
-export default function ResultGallery({ results, zipUrl, onReset }) {
+export default function ResultGallery({ results = [], failedImages = [], zipUrl, onReset }) {
   const [showDonateDialog, setShowDonateDialog] = useState(false);
+  const hasResults = results.length > 0;
+  const hasFailures = failedImages.length > 0;
+  const headerTitle = hasResults && hasFailures
+    ? 'Processed with Warnings'
+    : hasResults
+      ? 'Compressed Successfully'
+      : 'Processing Failed';
+
   const getAssetUrl = (url) => {
     if (!url) return '';
     if (/^data:/i.test(url)) return url;
@@ -104,10 +112,14 @@ export default function ResultGallery({ results, zipUrl, onReset }) {
             <CheckCircle2 size={32} />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-slate-800 tracking-tight">Compressed Successfully</h3>
-            <p className="urdu-text text-[11px] leading-3 text-slate-400 mt-1">تمام تصاویر کامیابی کے ساتھ تیار ہو گئی ہیں</p>
+            <h3 className="text-xl font-bold text-slate-800 tracking-tight">{headerTitle}</h3>
+            <p className="urdu-text text-[11px] leading-3 text-slate-400 mt-1">
+              {hasFailures ? 'کچھ تصاویر تیار نہیں ہو سکیں' : 'تمام تصاویر کامیابی کے ساتھ تیار ہو گئی ہیں'}
+            </p>
             <p className="text-xs text-slate-500 mt-1">
-              All images have been adjusted to 600x800 px and fit within the <span className="font-semibold text-punjab-green">11KB - 24KB</span> size range.
+              {hasResults
+                ? <>Processed images have been adjusted to 600x800 px and fit within the <span className="font-semibold text-punjab-green">11KB - 24KB</span> size range.</>
+                : 'No files were processed. Please check the details below and upload again.'}
             </p>
           </div>
         </div>
@@ -179,9 +191,40 @@ export default function ResultGallery({ results, zipUrl, onReset }) {
         </div>
       )}
 
+      {hasFailures && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 rounded-xl bg-white p-2 text-amber-600">
+              <AlertTriangle size={18} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="font-bold text-amber-900">
+                {failedImages.length} image{failedImages.length === 1 ? '' : 's'} need retry
+              </h4>
+              <p className="mt-1 text-xs text-amber-800/80">
+                Successful images are still ready. Retry only the files listed below.
+              </p>
+              <div className="mt-3 space-y-2">
+                {failedImages.map((item, index) => (
+                  <div key={`${item.original_name}-${index}`} className="rounded-xl bg-white/75 border border-amber-100 px-3 py-2">
+                    <p className="truncate text-xs font-bold text-slate-800" title={item.original_name}>
+                      {item.original_name || `Image ${index + 1}`}
+                    </p>
+                    <p className="mt-0.5 text-[11px] font-medium text-amber-700">
+                      {item.reason || 'Processing failed. Please retry this image.'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Grid of processed images */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-        {results.map((img, index) => {
+      {hasResults ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+          {results.map((img, index) => {
           const isSizeValid = img.size_kb >= 11 && img.size_kb <= 24;
 
           return (
@@ -227,8 +270,15 @@ export default function ResultGallery({ results, zipUrl, onReset }) {
               </div>
             </div>
           );
-        })}
-      </div>
+          })}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-slate-100 bg-white p-8 text-center shadow-sm">
+          <AlertTriangle size={28} className="mx-auto text-amber-500" />
+          <p className="mt-3 text-sm font-bold text-slate-700">No preview files are available.</p>
+          <p className="mt-1 text-xs text-slate-400">Please upload the failed images again.</p>
+        </div>
+      )}
 
       {/* Process More Section */}
       <div className="flex justify-center pt-4">

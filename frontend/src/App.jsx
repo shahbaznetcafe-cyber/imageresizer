@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { School, LogOut, Check } from 'lucide-react';
+import { Database, School, LogOut, Check } from 'lucide-react';
 import LoginRecordForm from './components/LoginRecordForm';
 import UploadArea from './components/UploadArea';
 import CropEditor from './components/CropEditor';
 import ProcessingStatus from './components/ProcessingStatus';
 import ResultGallery from './components/ResultGallery';
 import FooterBranding from './components/FooterBranding';
+import AdminRecords from './components/AdminRecords';
 import { getApiErrorMessage, getNetworkErrorMessage } from './utils/apiErrors';
 import { getApiUrl } from './utils/api';
 
@@ -100,8 +101,10 @@ export default function App() {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [croppedFiles, setCroppedFiles] = useState([]);
   const [results, setResults] = useState([]);
+  const [failedImages, setFailedImages] = useState([]);
   const [zipUrl, setZipUrl] = useState(null);
   const [error, setError] = useState(null);
+  const [showAdmin, setShowAdmin] = useState(() => ['#records', '#admin'].includes(window.location.hash));
 
   useEffect(() => {
     const cachedSession = loadCachedSession();
@@ -110,6 +113,15 @@ export default function App() {
       setStep('upload');
       warmBackendProcessor();
     }
+  }, []);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setShowAdmin(['#records', '#admin'].includes(window.location.hash));
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   const handleLoginSuccess = (sessionData) => {
@@ -155,7 +167,8 @@ export default function App() {
       }
 
       const data = await response.json();
-      setResults(data.images);
+      setResults(data.images || []);
+      setFailedImages(data.failed_images || []);
       setZipUrl(data.zip_data_url || data.zip_url);
       
       // Update local session processed count
@@ -194,6 +207,7 @@ export default function App() {
     setUploadedFiles([]);
     setCroppedFiles([]);
     setResults([]);
+    setFailedImages([]);
     setZipUrl(null);
     setError(null);
     setStep('upload');
@@ -233,18 +247,32 @@ export default function App() {
           </div>
 
           {session && (
-            <div className="flex items-center gap-4 bg-slate-50 border border-slate-200/50 rounded-xl p-2 pl-3 pr-2.5 shadow-sm text-xs transition-all duration-300">
-              <div className="text-right">
-                <p className="font-semibold text-slate-700 font-mono">EMIS: {session.emis_code}</p>
-                <p className="text-[10px] text-slate-400">Processed: {session.processed_count} photos</p>
-              </div>
+            <div className="flex items-center gap-2">
               <button
-                onClick={handleLogout}
-                className="p-2 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
-                title="Change EMIS Code"
+                onClick={() => {
+                  window.location.hash = 'records';
+                  setShowAdmin(true);
+                }}
+                className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-500 hover:text-punjab-blue hover:bg-slate-50 transition-colors"
+                title="Open admin records"
               >
-                <LogOut size={16} />
+                <Database size={15} />
+                Records
               </button>
+
+              <div className="flex items-center gap-4 bg-slate-50 border border-slate-200/50 rounded-xl p-2 pl-3 pr-2.5 shadow-sm text-xs transition-all duration-300">
+                <div className="text-right">
+                  <p className="font-semibold text-slate-700 font-mono">EMIS: {session.emis_code}</p>
+                  <p className="text-[10px] text-slate-400">Processed: {session.processed_count} photos</p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="p-2 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                  title="Change EMIS Code"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -254,7 +282,7 @@ export default function App() {
       <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-8 flex flex-col justify-center items-center">
         
         {/* Step Stepper Header (Only shown if logged in) */}
-        {step !== 'login' && (
+        {!showAdmin && step !== 'login' && (
           <div className="w-full max-w-2xl mb-8">
             <div className="flex items-center justify-between relative px-2">
               {/* Stepper connecting line */}
@@ -289,7 +317,7 @@ export default function App() {
         )}
 
         {/* Global Error Banner */}
-        {error && step !== 'processing' && (
+        {!showAdmin && error && step !== 'processing' && (
           <div className="w-full max-w-md p-4 mb-6 bg-red-50 border-l-4 border-red-500 rounded-xl text-sm text-red-700 shadow-sm space-y-1">
             <p className="font-semibold">{error.en}</p>
             <p className="urdu-text text-right text-xs leading-5">{error.ur}</p>
@@ -298,12 +326,28 @@ export default function App() {
 
         {/* Step components */}
         <div className="w-full flex justify-center">
-          {step === 'login' && <LoginRecordForm onLoginSuccess={handleLoginSuccess} />}
-          {step === 'upload' && <UploadArea onFilesSelected={handleFilesSelected} />}
-          {step === 'crop' && <CropEditor files={uploadedFiles} onCroppingDone={handleCroppingDone} />}
-          {step === 'processing' && <ProcessingStatus files={croppedFiles} />}
-          {step === 'result' && (
-            <ResultGallery results={results} zipUrl={zipUrl} onReset={handleReset} />
+          {showAdmin ? (
+            <AdminRecords
+              onBack={() => {
+                window.location.hash = '';
+                setShowAdmin(false);
+              }}
+            />
+          ) : (
+            <>
+              {step === 'login' && <LoginRecordForm onLoginSuccess={handleLoginSuccess} />}
+              {step === 'upload' && <UploadArea onFilesSelected={handleFilesSelected} />}
+              {step === 'crop' && <CropEditor files={uploadedFiles} onCroppingDone={handleCroppingDone} />}
+              {step === 'processing' && <ProcessingStatus files={croppedFiles} />}
+              {step === 'result' && (
+                <ResultGallery
+                  results={results}
+                  failedImages={failedImages}
+                  zipUrl={zipUrl}
+                  onReset={handleReset}
+                />
+              )}
+            </>
           )}
         </div>
       </main>

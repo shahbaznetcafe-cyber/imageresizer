@@ -83,6 +83,22 @@ The app is optimized to reduce generation time:
 
 ---
 
+## Private Admin Records
+
+The app stores each login session and processed-image count in the backend database. Public activity stats never show phone numbers. To view the private EMIS and phone records:
+
+1. Set `ADMIN_KEY` on the backend host to a strong private value.
+2. Redeploy the backend.
+3. Open the frontend URL with `#records`, for example:
+   ```text
+   https://pectaa.shahbaznetcafe.com/#records
+   ```
+4. Paste the same `ADMIN_KEY` into the admin form and click **Load Records**.
+
+The records page can export CSV with EMIS code, phone number, session date, and image counts.
+
+---
+
 ## Deployment to Render
 
 This repository is equipped with a `render.yaml` blueprint file for easy, unified deployment.
@@ -162,5 +178,6 @@ For a separate Vercel backend project:
 - Environment Variable: `PYTHON_VERSION=3.12`
 - Environment Variable: `PRELOAD_REMBG_MODEL=0`
 - Environment Variable: `REMBG_MODEL=u2netp`
+- Environment Variable: `ADMIN_KEY=your-private-admin-key`
 
 After the backend deploys, set the frontend project's `VITE_API_URL` to the backend Vercel URL and redeploy the frontend.

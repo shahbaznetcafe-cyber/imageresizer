@@ -324,3 +324,54 @@ def get_activity_summary(limit: int = 8) -> dict:
         "recent_images": recent_images,
         "recent_sessions": recent_sessions,
     }
+
+
+def get_admin_records(limit: int = 500) -> dict:
+    """Returns private school/session records for the protected admin view."""
+    conn = _connect()
+    cursor = conn.cursor()
+    limit_placeholder = "%s" if IS_POSTGRES else "?"
+
+    cursor.execute("SELECT COUNT(*) AS total_sessions FROM school_sessions")
+    total_sessions = _row_to_dict(cursor.fetchone())["total_sessions"]
+
+    cursor.execute("SELECT COUNT(DISTINCT emis_code) AS total_schools FROM school_sessions")
+    total_schools = _row_to_dict(cursor.fetchone())["total_schools"]
+
+    cursor.execute("SELECT COUNT(*) AS total_images FROM processed_images")
+    total_images = _row_to_dict(cursor.fetchone())["total_images"]
+
+    cursor.execute(
+        f"""
+        SELECT
+            school_sessions.id,
+            school_sessions.emis_code,
+            school_sessions.phone_number,
+            school_sessions.created_at,
+            school_sessions.processed_count AS session_processed_count,
+            COUNT(processed_images.id) AS images_recorded,
+            COALESCE(SUM(processed_images.size_kb), 0) AS total_size_kb,
+            MAX(processed_images.created_at) AS last_processed_at
+        FROM school_sessions
+        LEFT JOIN processed_images
+            ON processed_images.session_id = school_sessions.id
+        GROUP BY
+            school_sessions.id,
+            school_sessions.emis_code,
+            school_sessions.phone_number,
+            school_sessions.created_at,
+            school_sessions.processed_count
+        ORDER BY school_sessions.created_at DESC, school_sessions.id DESC
+        LIMIT {limit_placeholder}
+        """,
+        (limit,),
+    )
+    sessions = [_row_to_dict(row) for row in cursor.fetchall()]
+
+    conn.close()
+    return {
+        "total_sessions": int(total_sessions or 0),
+        "total_schools": int(total_schools or 0),
+        "total_images": int(total_images or 0),
+        "sessions": sessions,
+    }

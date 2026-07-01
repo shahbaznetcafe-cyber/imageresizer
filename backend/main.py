@@ -5,7 +5,7 @@ import uuid
 import zipfile
 from typing import List
 from datetime import datetime, timedelta
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
@@ -17,6 +17,7 @@ try:
         init_db,
         create_session,
         get_activity_summary,
+        get_admin_records,
         get_session,
         record_processed_images,
         update_processed_count,
@@ -28,6 +29,7 @@ except ImportError:
         init_db,
         create_session,
         get_activity_summary,
+        get_admin_records,
         get_session,
         record_processed_images,
         update_processed_count,
@@ -38,6 +40,7 @@ except ImportError:
 # Initialize FastAPI application
 app = FastAPI(title="PECTAA Image Resizer API")
 SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "2"))
+ADMIN_KEY = os.getenv("ADMIN_KEY", "")
 
 # Configure CORS
 origins = [
@@ -169,6 +172,14 @@ def api_activity():
     """Returns live landing-page activity stats and recent image records."""
     return get_activity_summary()
 
+
+@app.get("/api/admin/records")
+def api_admin_records(x_admin_key: str = Header(default="")):
+    """Returns private EMIS/phone records after admin-key verification."""
+    if not ADMIN_KEY or x_admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=401, detail="Invalid admin key.")
+    return get_admin_records()
+
 @app.post("/api/process-images")
 async def api_process_images(
     background_tasks: BackgroundTasks,
@@ -205,10 +216,10 @@ async def api_process_images(
     background_tasks.add_task(cleanup_old_files)
     
     processed_images = []
-    temp_file_paths = []
+    failed_images = []
     
     # 3. Process Each Image
-    for idx, upload_file in enumerate(files):
+    for upload_file in files:
         # Validate File Type
         content_type = upload_file.content_type
         filename = upload_file.filename or "image.jpg"
@@ -218,13 +229,11 @@ async def api_process_images(
         valid_mimetypes = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
         
         if ext not in valid_extensions and content_type not in valid_mimetypes:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "en": f"Unsupported format for '{filename}'. Only JPG, JPEG, PNG, and WEBP are allowed.",
-                    "ur": f"فائل '{filename}' کا فارمیٹ غیر تعاون یافتہ ہے۔ صرف JPG, JPEG, PNG اور WEBP کی اجازت ہے۔"
-                }
-            )
+            failed_images.append({
+                "original_name": filename,
+                "reason": "Unsupported format. Only JPG, JPEG, PNG, and WEBP are allowed.",
+            })
+            continue
             
         # Read file bytes to check size and process
         file_bytes = await upload_file.read()
@@ -233,13 +242,11 @@ async def api_process_images(
         # Validate File Size (10MB limit)
         max_size_bytes = 10 * 1024 * 1024  # 10MB
         if file_size > max_size_bytes:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "en": f"File '{filename}' exceeds the 10MB limit.",
-                    "ur": f"فائل '{filename}' 10MB کی حد سے زیادہ ہے۔"
-                }
-            )
+            failed_images.append({
+                "original_name": filename,
+                "reason": "File exceeds the 10MB limit.",
+            })
+            continue
             
         try:
             # Process image (remove background, scale/center on 600x800 white canvas, compress to 11KB-24KB)
@@ -254,8 +261,6 @@ async def api_process_images(
             with open(processed_path, "wb") as f:
                 f.write(processed_data)
                 
-            temp_file_paths.append(processed_path)
-            
             # Add to response array
             processed_images.append({
                 "original_name": filename,
@@ -268,20 +273,11 @@ async def api_process_images(
         except BaseException as e:
             # Catch ALL exceptions including SystemExit from onnxruntime
             # so the server process itself never dies
-            for path in temp_file_paths:
-                try:
-                    if os.path.exists(path):
-                        os.remove(path)
-                except Exception:
-                    pass
             error_msg = str(e) if str(e) else type(e).__name__
-            raise HTTPException(
-                status_code=500,
-                detail={
-                    "en": f"Error processing image '{filename}': {error_msg}",
-                    "ur": f"تصویر '{filename}' کو پروسیس کرنے میں خرابی پیش آئی: {error_msg}"
-                }
-            )
+            failed_images.append({
+                "original_name": filename,
+                "reason": f"Processing failed: {error_msg}",
+            })
             
     # 4. Generate ZIP if multiple images
     zip_url = None
@@ -314,11 +310,14 @@ async def api_process_images(
     new_count = update_processed_count(session_id, len(processed_images))
     
     return {
-        "success": True,
+        "success": len(processed_images) > 0,
         "processed_count": len(processed_images),
+        "failed_count": len(failed_images),
         "total_session_count": new_count,
         "images": processed_images,
+        "failed_images": failed_images,
         "zip_url": zip_url,
         "zip_data_url": zip_data_url,
         "activity": get_activity_summary()
     }
+
