@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, ShieldCheck, Sparkles, Image, CheckCircle2, Files, Pin } from 'lucide-react';
+import { Loader2, ShieldCheck, Sparkles, Image, CheckCircle2, Files } from 'lucide-react';
 
 export default function ProcessingStatus({ files = [] }) {
   const totalFiles = Math.max(files.length, 1);
@@ -98,29 +98,6 @@ export default function ProcessingStatus({ files = [] }) {
 
       <div className="text-xs text-slate-400 font-medium">
         Please do not close this window. Larger batches can take up to 60-90 seconds while the server prepares each image.
-      </div>
-
-      <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4 text-left space-y-3">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 h-8 w-8 rounded-xl bg-white text-amber-600 flex items-center justify-center shrink-0 shadow-sm">
-            <Pin size={16} />
-          </div>
-          <div className="min-w-0 space-y-3">
-            <div dir="rtl" className="urdu-text text-right text-xs leading-6 text-slate-700">
-              <p className="font-bold text-slate-800">📌 نوٹ</p>
-              <p>
-                پہلی بار براہِ کرم صرف ایک تصویر اپ لوڈ کریں۔ چونکہ پہلی مرتبہ پروسیسنگ ماڈل لوڈ ہوتا ہے، اس لیے اس عمل میں تقریباً 60 سے 90 سیکنڈ لگ سکتے ہیں۔ ماڈل لوڈ ہونے کے بعد آپ باآسانی ایک ساتھ متعدد (Bulk) تصاویر اپ لوڈ کر سکتے ہیں، اور پروسیسنگ کافی تیز ہو جائے گی۔
-              </p>
-            </div>
-
-            <div className="text-xs leading-5 text-slate-600">
-              <p className="font-bold text-slate-800">📌 Note</p>
-              <p>
-                For the first use, please upload only one image. The processing model loads initially, so it may take approximately 60-90 seconds. After the model has loaded, you can upload multiple bulk images and processing will be significantly faster.
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
 
       <p className="text-[10px] uppercase tracking-[0.18em] font-bold text-slate-400">

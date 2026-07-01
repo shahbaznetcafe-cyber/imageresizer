@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { UploadCloud, FileImage, Trash2, AlertCircle, ArrowRight } from 'lucide-react';
+import { UploadCloud, FileImage, Trash2, AlertCircle, ArrowRight, Pin } from 'lucide-react';
 
 export default function UploadArea({ onFilesSelected }) {
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -134,6 +134,20 @@ export default function UploadArea({ onFilesSelected }) {
           تصاویر کو یہاں کھینچ کر لائیں یا کلک کر کے منتخب کریں <br />
           <span className="text-xs text-slate-400 font-normal">زیادہ سے زیادہ 10 تصاویر (ہر تصویر حد 10MB)</span>
         </p>
+      </div>
+
+      <div className="rounded-2xl border border-amber-100 bg-amber-50/80 p-4 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 h-9 w-9 rounded-xl bg-white text-amber-600 flex items-center justify-center shrink-0 shadow-sm">
+            <Pin size={17} />
+          </div>
+          <div dir="rtl" className="urdu-text text-right text-xs leading-6 text-slate-700">
+            <p className="font-bold text-slate-800">📌 نوٹ</p>
+            <p>
+              پہلی بار براہِ کرم صرف ایک تصویر اپ لوڈ کریں۔ چونکہ پہلی مرتبہ پروسیسنگ ماڈل لوڈ ہوتا ہے، اس لیے اس عمل میں تقریباً 60 سے 90 سیکنڈ لگ سکتے ہیں۔ ماڈل لوڈ ہونے کے بعد آپ باآسانی ایک ساتھ متعدد (Bulk) تصاویر اپ لوڈ کر سکتے ہیں، اور پروسیسنگ کافی تیز ہو جائے گی۔
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Uploaded Files List */}
