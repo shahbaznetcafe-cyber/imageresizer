@@ -11,7 +11,7 @@ const products = [
 export default function SBZSideRails() {
   return (
     <>
-      <aside className="hidden 2xl:block fixed left-8 top-60 z-10 w-48">
+      <aside className="hidden 2xl:block fixed left-10 top-52 z-10 w-48">
         <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm backdrop-blur">
           <div className="flex items-center gap-2">
             <div className="h-9 w-9 rounded-xl bg-punjab-green text-white flex items-center justify-center">
@@ -19,12 +19,12 @@ export default function SBZSideRails() {
             </div>
             <div>
               <p className="text-sm font-black text-slate-800">SBZ Tech</p>
-              <p className="text-[10px] uppercase font-bold text-punjab-green">Free utility</p>
+              <p className="text-[10px] uppercase font-bold text-punjab-green">Free school tools</p>
             </div>
           </div>
 
           <p className="mt-3 text-xs leading-5 text-slate-500">
-            Digital school tools for Pakistani schools, operators, and small offices.
+            Software, forms, and digital utilities for Pakistani schools and operators.
           </p>
 
           <a
@@ -39,7 +39,7 @@ export default function SBZSideRails() {
         </div>
       </aside>
 
-      <aside className="hidden 2xl:block fixed right-8 top-60 z-10 w-52">
+      <aside className="hidden 2xl:block fixed right-10 top-52 z-10 w-52">
         <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm backdrop-blur">
           <div className="flex items-center gap-2">
             <div className="h-9 w-9 rounded-xl bg-punjab-blue text-white flex items-center justify-center">
