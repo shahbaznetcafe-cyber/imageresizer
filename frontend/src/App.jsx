@@ -7,6 +7,7 @@ import ProcessingStatus from './components/ProcessingStatus';
 import ResultGallery from './components/ResultGallery';
 import FooterBranding from './components/FooterBranding';
 import AdminRecords from './components/AdminRecords';
+import SBZSideRails from './components/SBZSideRails';
 import { getApiErrorMessage, getNetworkErrorMessage } from './utils/apiErrors';
 import { getApiUrl } from './utils/api';
 
@@ -221,6 +222,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-slate-50 text-slate-800">
+      <SBZSideRails />
       
       {/* Top Header / Branding */}
       <header className="bg-white border-b border-slate-200 shadow-sm py-4 px-6 sticky top-0 z-30">
