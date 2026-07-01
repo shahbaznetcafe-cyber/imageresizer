@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Coffee, Download, CheckCircle2, RotateCcw, AlertTriangle, X } from 'lucide-react';
+import { HeartHandshake, Download, CheckCircle2, RotateCcw, AlertTriangle, X } from 'lucide-react';
 import { getApiUrl } from '../utils/api';
 
 function getRetryUrl(url, retryCount) {
@@ -92,8 +92,8 @@ export default function ResultGallery({ results, zipUrl, onReset }) {
           onClick={() => setShowDonateDialog(true)}
           className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-5 rounded-xl shadow-lg hover:shadow-xl transition-all-custom flex items-center justify-center gap-2 text-sm"
         >
-          <Coffee size={18} />
-          <span>☕ Donate a Coffee</span>
+          <HeartHandshake size={18} />
+          <span>Help Keep This Tool Free</span>
         </button>
       </div>
 
@@ -117,8 +117,8 @@ export default function ResultGallery({ results, zipUrl, onReset }) {
             onClick={() => setShowDonateDialog(true)}
             className="w-full sm:w-auto bg-white hover:bg-amber-50 text-amber-700 border border-amber-200 font-bold py-3.5 px-5 rounded-xl shadow-sm hover:shadow-md transition-all-custom flex items-center justify-center gap-2 text-sm"
           >
-            <Coffee size={18} />
-            <span>☕ Donate a Coffee</span>
+            <HeartHandshake size={18} />
+            <span>Help Keep This Tool Free</span>
           </button>
 
           {zipUrl && (
@@ -142,9 +142,12 @@ export default function ResultGallery({ results, zipUrl, onReset }) {
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-amber-50 text-amber-700">
-                  <Coffee size={20} />
+                  <HeartHandshake size={20} />
                 </div>
-                <h4 className="font-bold text-slate-800">Donate a Coffee</h4>
+                <div>
+                  <h4 className="font-bold text-slate-800">Help Keep This Tool Free</h4>
+                  <p className="text-[11px] text-slate-400">Your support helps SBZ Tech maintain free school utilities.</p>
+                </div>
               </div>
               <button
                 onClick={() => setShowDonateDialog(false)}
