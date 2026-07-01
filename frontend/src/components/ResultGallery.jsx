@@ -168,6 +168,9 @@ export default function ResultGallery({ results, zipUrl, onReset }) {
                 <p className="text-[10px] uppercase font-bold text-slate-400">Easy Paisa</p>
                 <p className="text-xl font-bold text-slate-800 font-mono mt-1">03457942747</p>
               </div>
+              <p className="text-[11px] text-center text-slate-400 font-medium">
+                Thank you for supporting SBZ Tech school tools.
+              </p>
             </div>
           </div>
         </div>
