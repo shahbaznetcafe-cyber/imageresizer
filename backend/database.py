@@ -52,6 +52,31 @@ def _connect():
     return _connect_postgres() if IS_POSTGRES else _connect_sqlite()
 
 
+def _column_exists(cursor, table_name: str, column_name: str) -> bool:
+    if IS_POSTGRES:
+        cursor.execute(
+            """
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = %s
+              AND column_name = %s
+            """,
+            (table_name, column_name),
+        )
+        return cursor.fetchone() is not None
+
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    return any(row["name"] == column_name for row in cursor.fetchall())
+
+
+def _ensure_column(cursor, table_name: str, column_name: str, column_type: str) -> None:
+    if _column_exists(cursor, table_name, column_name):
+        return
+
+    cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
+
+
 def init_db():
     """Initializes the database schema if it doesn't already exist."""
     conn = _connect()
@@ -64,6 +89,9 @@ def init_db():
                 id BIGSERIAL PRIMARY KEY,
                 emis_code TEXT NOT NULL,
                 phone_number TEXT NOT NULL,
+                school_name TEXT,
+                machine_id TEXT,
+                machine_type TEXT,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 processed_count INTEGER NOT NULL DEFAULT 0
             )
@@ -76,6 +104,9 @@ def init_db():
                 session_id BIGINT NOT NULL REFERENCES school_sessions(id) ON DELETE CASCADE,
                 emis_code TEXT NOT NULL,
                 phone_number TEXT NOT NULL,
+                school_name TEXT,
+                machine_id TEXT,
+                machine_type TEXT,
                 original_name TEXT NOT NULL,
                 processed_name TEXT NOT NULL,
                 url TEXT NOT NULL,
@@ -91,6 +122,9 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 emis_code TEXT NOT NULL,
                 phone_number TEXT NOT NULL,
+                school_name TEXT,
+                machine_id TEXT,
+                machine_type TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 processed_count INTEGER DEFAULT 0
             )
@@ -103,6 +137,9 @@ def init_db():
                 session_id INTEGER NOT NULL,
                 emis_code TEXT NOT NULL,
                 phone_number TEXT NOT NULL,
+                school_name TEXT,
+                machine_id TEXT,
+                machine_type TEXT,
                 original_name TEXT NOT NULL,
                 processed_name TEXT NOT NULL,
                 url TEXT NOT NULL,
@@ -112,6 +149,11 @@ def init_db():
             )
             """
         )
+
+    for table_name in ("school_sessions", "processed_images"):
+        _ensure_column(cursor, table_name, "school_name", "TEXT")
+        _ensure_column(cursor, table_name, "machine_id", "TEXT")
+        _ensure_column(cursor, table_name, "machine_type", "TEXT")
 
     cursor.execute(
         """
@@ -131,11 +173,23 @@ def init_db():
         ON processed_images(session_id)
         """
     )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_school_sessions_machine_id
+        ON school_sessions(machine_id)
+        """
+    )
     conn.commit()
     conn.close()
 
 
-def create_session(emis_code: str, phone_number: str) -> dict:
+def create_session(
+    emis_code: str,
+    phone_number: str,
+    school_name: str = "",
+    machine_id: str = "",
+    machine_type: str = "",
+) -> dict:
     """Creates a new session and returns it."""
     conn = _connect()
     cursor = conn.cursor()
@@ -143,22 +197,31 @@ def create_session(emis_code: str, phone_number: str) -> dict:
     if IS_POSTGRES:
         cursor.execute(
             """
-            INSERT INTO school_sessions (emis_code, phone_number)
-            VALUES (%s, %s)
-            RETURNING id, emis_code, phone_number, created_at, processed_count
+            INSERT INTO school_sessions (
+                emis_code, phone_number, school_name, machine_id, machine_type
+            )
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id, emis_code, phone_number, school_name, machine_id,
+                machine_type, created_at, processed_count
             """,
-            (emis_code, phone_number),
+            (emis_code, phone_number, school_name, machine_id, machine_type),
         )
         row = cursor.fetchone()
     else:
         cursor.execute(
-            "INSERT INTO school_sessions (emis_code, phone_number) VALUES (?, ?)",
-            (emis_code, phone_number),
+            """
+            INSERT INTO school_sessions (
+                emis_code, phone_number, school_name, machine_id, machine_type
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (emis_code, phone_number, school_name, machine_id, machine_type),
         )
         session_id = cursor.lastrowid
         cursor.execute(
             """
-            SELECT id, emis_code, phone_number, created_at, processed_count
+            SELECT id, emis_code, phone_number, school_name, machine_id,
+                machine_type, created_at, processed_count
             FROM school_sessions
             WHERE id = ?
             """,
@@ -208,7 +271,8 @@ def get_session(session_id: int) -> dict:
     if IS_POSTGRES:
         cursor.execute(
             """
-            SELECT id, emis_code, phone_number, created_at, processed_count
+            SELECT id, emis_code, phone_number, school_name, machine_id,
+                machine_type, created_at, processed_count
             FROM school_sessions
             WHERE id = %s
             """,
@@ -217,7 +281,8 @@ def get_session(session_id: int) -> dict:
     else:
         cursor.execute(
             """
-            SELECT id, emis_code, phone_number, created_at, processed_count
+            SELECT id, emis_code, phone_number, school_name, machine_id,
+                machine_type, created_at, processed_count
             FROM school_sessions
             WHERE id = ?
             """,
@@ -239,19 +304,19 @@ def record_processed_images(session: dict, processed_images: list[dict]) -> None
     sql = (
         """
         INSERT INTO processed_images (
-            session_id, emis_code, phone_number, original_name,
-            processed_name, url, size_kb
+            session_id, emis_code, phone_number, school_name, machine_id,
+            machine_type, original_name, processed_name, url, size_kb
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         if IS_POSTGRES
         else
         """
         INSERT INTO processed_images (
-            session_id, emis_code, phone_number, original_name,
-            processed_name, url, size_kb
+            session_id, emis_code, phone_number, school_name, machine_id,
+            machine_type, original_name, processed_name, url, size_kb
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
     )
     cursor.executemany(
@@ -261,6 +326,9 @@ def record_processed_images(session: dict, processed_images: list[dict]) -> None
                 session["id"],
                 session["emis_code"],
                 session["phone_number"],
+                session.get("school_name") or "",
+                session.get("machine_id") or "",
+                session.get("machine_type") or "",
                 image["original_name"],
                 image["processed_name"],
                 image["url"],
@@ -287,6 +355,9 @@ def get_activity_summary(limit: int = 8) -> dict:
 
     cursor.execute("SELECT COUNT(*) AS total_images FROM processed_images")
     total_images = _row_to_dict(cursor.fetchone())["total_images"]
+
+    cursor.execute("SELECT COUNT(DISTINCT machine_id) AS total_machines FROM school_sessions WHERE COALESCE(machine_id, '') <> ''")
+    total_machines = _row_to_dict(cursor.fetchone())["total_machines"]
 
     cursor.execute(
         f"""
@@ -321,6 +392,7 @@ def get_activity_summary(limit: int = 8) -> dict:
         "total_sessions": int(total_sessions or 0),
         "total_schools": int(total_schools or 0),
         "total_images": int(total_images or 0),
+        "total_machines": int(total_machines or 0),
         "recent_images": recent_images,
         "recent_sessions": recent_sessions,
     }
@@ -341,6 +413,9 @@ def get_admin_records(limit: int = 500) -> dict:
     cursor.execute("SELECT COUNT(*) AS total_images FROM processed_images")
     total_images = _row_to_dict(cursor.fetchone())["total_images"]
 
+    cursor.execute("SELECT COUNT(DISTINCT machine_id) AS total_machines FROM school_sessions WHERE COALESCE(machine_id, '') <> ''")
+    total_machines = _row_to_dict(cursor.fetchone())["total_machines"]
+
     cursor.execute(
         f"""
         WITH school_rollup AS (
@@ -348,6 +423,7 @@ def get_admin_records(limit: int = 500) -> dict:
                 emis_code,
                 COUNT(*) AS session_count,
                 SUM(processed_count) AS session_processed_count,
+                COUNT(DISTINCT NULLIF(machine_id, '')) AS machine_count,
                 MIN(created_at) AS first_session_at,
                 MAX(created_at) AS last_session_at
             FROM school_sessions
@@ -365,13 +441,38 @@ def get_admin_records(limit: int = 500) -> dict:
         SELECT
             school_rollup.emis_code,
             (
+                SELECT latest.school_name
+                FROM school_sessions AS latest
+                WHERE latest.emis_code = school_rollup.emis_code
+                  AND COALESCE(latest.school_name, '') <> ''
+                ORDER BY latest.created_at DESC, latest.id DESC
+                LIMIT 1
+            ) AS school_name,
+            (
                 SELECT latest.phone_number
                 FROM school_sessions AS latest
                 WHERE latest.emis_code = school_rollup.emis_code
                 ORDER BY latest.created_at DESC, latest.id DESC
                 LIMIT 1
             ) AS phone_number,
+            (
+                SELECT latest.machine_id
+                FROM school_sessions AS latest
+                WHERE latest.emis_code = school_rollup.emis_code
+                  AND COALESCE(latest.machine_id, '') <> ''
+                ORDER BY latest.created_at DESC, latest.id DESC
+                LIMIT 1
+            ) AS machine_id,
+            (
+                SELECT latest.machine_type
+                FROM school_sessions AS latest
+                WHERE latest.emis_code = school_rollup.emis_code
+                  AND COALESCE(latest.machine_type, '') <> ''
+                ORDER BY latest.created_at DESC, latest.id DESC
+                LIMIT 1
+            ) AS machine_type,
             school_rollup.session_count,
+            school_rollup.machine_count,
             COALESCE(school_rollup.session_processed_count, 0) AS session_processed_count,
             school_rollup.first_session_at,
             school_rollup.last_session_at,
@@ -393,6 +494,7 @@ def get_admin_records(limit: int = 500) -> dict:
         "total_sessions": int(total_sessions or 0),
         "total_schools": int(total_schools or 0),
         "total_images": int(total_images or 0),
+        "total_machines": int(total_machines or 0),
         "schools": schools,
         "sessions": schools,
     }

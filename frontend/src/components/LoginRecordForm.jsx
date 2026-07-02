@@ -1,11 +1,53 @@
 import React, { useEffect, useState } from 'react';
-import { School, Phone, ArrowRight, Loader2, History, LockKeyhole } from 'lucide-react';
+import { School, Phone, ArrowRight, Loader2, History, LockKeyhole, Building2, MonitorSmartphone } from 'lucide-react';
 import { getApiErrorMessage, getNetworkErrorMessage } from '../utils/apiErrors';
 import { getApiUrl } from '../utils/api';
 
+const REMEMBER_LOGIN_KEY = 'pectaa-remember-login';
+const MACHINE_ID_KEY = 'pectaa-machine-id';
+const REMEMBER_MS = 15 * 24 * 60 * 60 * 1000;
+
+function getMachineId() {
+  const existing = window.localStorage.getItem(MACHINE_ID_KEY);
+  if (existing) return existing;
+
+  const id = window.crypto?.randomUUID?.()
+    || `sbz-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  window.localStorage.setItem(MACHINE_ID_KEY, id);
+  return id;
+}
+
+function getMachineType() {
+  const ua = window.navigator.userAgent || '';
+  const platform = window.navigator.platform || '';
+  const touch = window.navigator.maxTouchPoints > 1;
+  const width = window.screen?.width || window.innerWidth;
+
+  const device = /ipad|tablet/i.test(ua)
+    ? 'Tablet'
+    : /mobi|android|iphone/i.test(ua) || width < 768
+      ? 'Mobile'
+      : 'Desktop/Laptop';
+  const os = /windows/i.test(ua) || /win/i.test(platform)
+    ? 'Windows'
+    : /android/i.test(ua)
+      ? 'Android'
+      : /iphone|ipad|ios/i.test(ua)
+        ? 'iOS'
+        : /mac/i.test(platform)
+          ? 'macOS'
+          : /linux/i.test(platform)
+            ? 'Linux'
+            : 'Unknown OS';
+
+  return `${device} - ${os}${touch ? ' - Touch' : ''}`;
+}
+
 export default function LoginRecordForm({ onLoginSuccess, onAdminOpen }) {
   const [emisCode, setEmisCode] = useState('');
+  const [schoolName, setSchoolName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activity, setActivity] = useState(null);
@@ -23,6 +65,24 @@ export default function LoginRecordForm({ onLoginSuccess, onAdminOpen }) {
       return '';
     }
   };
+
+  useEffect(() => {
+    try {
+      getMachineId();
+      const remembered = JSON.parse(window.localStorage.getItem(REMEMBER_LOGIN_KEY) || 'null');
+      if (!remembered || remembered.expiresAt <= Date.now()) {
+        window.localStorage.removeItem(REMEMBER_LOGIN_KEY);
+        return;
+      }
+
+      setEmisCode(remembered.emisCode || '');
+      setSchoolName(remembered.schoolName || '');
+      setPhoneNumber(remembered.phoneNumber || '');
+      setRememberMe(true);
+    } catch {
+      window.localStorage.removeItem(REMEMBER_LOGIN_KEY);
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -63,6 +123,15 @@ export default function LoginRecordForm({ onLoginSuccess, onAdminOpen }) {
       return;
     }
 
+    const schoolNameCleaned = schoolName.trim().replace(/\s+/g, ' ');
+    if (schoolNameCleaned.length < 2) {
+      setError({
+        en: 'School Name is required.',
+        ur: 'School Name is required.'
+      });
+      return;
+    }
+
     const phoneCleaned = phoneNumber.replace(/\D/g, '');
     if (phoneCleaned.length < 10 || phoneCleaned.length > 15) {
       setError({
@@ -78,7 +147,10 @@ export default function LoginRecordForm({ onLoginSuccess, onAdminOpen }) {
       // Create Session in Backend
       const formData = new FormData();
       formData.append('emis_code', emisCleaned);
+      formData.append('school_name', schoolNameCleaned);
       formData.append('phone_number', phoneNumber);
+      formData.append('machine_id', getMachineId());
+      formData.append('machine_type', getMachineType());
 
       // Determine backend API URL (runs on the same host or relative in production, fallback to local)
       const response = await fetch(getApiUrl('/api/session'), {
@@ -91,6 +163,19 @@ export default function LoginRecordForm({ onLoginSuccess, onAdminOpen }) {
       }
 
       const session = await response.json();
+      if (rememberMe) {
+        window.localStorage.setItem(
+          REMEMBER_LOGIN_KEY,
+          JSON.stringify({
+            emisCode: emisCleaned,
+            schoolName: schoolNameCleaned,
+            phoneNumber,
+            expiresAt: Date.now() + REMEMBER_MS,
+          })
+        );
+      } else {
+        window.localStorage.removeItem(REMEMBER_LOGIN_KEY);
+      }
       onLoginSuccess(session);
     } catch (err) {
       console.error(err);
@@ -146,6 +231,28 @@ export default function LoginRecordForm({ onLoginSuccess, onAdminOpen }) {
           </div>
         </div>
 
+        {/* School Name */}
+        <div className="space-y-1">
+          <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
+            <span className="flex items-center gap-1">
+              <Building2 size={14} className="text-punjab-green" />
+              School Name
+            </span>
+            <span dir="rtl" className="urdu-text text-[11px] leading-3 text-slate-400 text-right">School name</span>
+          </div>
+          <div className="relative mt-1">
+            <input
+              type="text"
+              required
+              maxLength={120}
+              placeholder="e.g. Govt Elementary School"
+              value={schoolName}
+              onChange={(e) => setSchoolName(e.target.value)}
+              className="w-full pl-3 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-punjab-green-light focus:border-transparent outline-none transition-all-custom text-slate-800 text-center text-base"
+            />
+          </div>
+        </div>
+
         {/* Phone Number */}
         <div className="space-y-1">
           <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
@@ -167,6 +274,24 @@ export default function LoginRecordForm({ onLoginSuccess, onAdminOpen }) {
             />
           </div>
         </div>
+
+        <label className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left cursor-pointer hover:bg-white transition-colors">
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-slate-300 text-punjab-green focus:ring-punjab-green"
+          />
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+              <MonitorSmartphone size={14} className="text-punjab-blue" />
+              Remember this school for 15 days
+            </span>
+            <span className="mt-0.5 block text-[10px] leading-4 text-slate-400">
+              Same browser par EMIS, school name, and phone auto-fill ho jayenge.
+            </span>
+          </span>
+        </label>
 
         {/* Submit Button */}
         <button

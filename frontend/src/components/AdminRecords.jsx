@@ -18,7 +18,11 @@ function formatDate(value) {
 function downloadCsv(rows) {
   const headers = [
     'EMIS Code',
+    'School Name',
     'Phone Number',
+    'Machine Type',
+    'Machine ID',
+    'Machine Count',
     'Sessions',
     'Images Recorded',
     'Session Count',
@@ -31,7 +35,11 @@ function downloadCsv(rows) {
   const escapeCell = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
   const body = rows.map((row) => [
     row.emis_code,
+    row.school_name,
     row.phone_number,
+    row.machine_type,
+    row.machine_id,
+    row.machine_count,
     row.session_count,
     row.images_recorded,
     row.session_processed_count,
@@ -63,6 +71,7 @@ export default function AdminRecords({ onBack }) {
   const totals = useMemo(() => ([
     { label: 'Schools', value: records?.total_schools || 0 },
     { label: 'Sessions', value: records?.total_sessions || 0 },
+    { label: 'Machines', value: records?.total_machines || 0 },
     { label: 'Photos', value: records?.total_images || 0 },
   ]), [records]);
 
@@ -102,7 +111,7 @@ export default function AdminRecords({ onBack }) {
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-800">Admin Records</h2>
-              <p className="text-xs text-slate-500">Private EMIS, phone, and image counts for your Supabase record.</p>
+              <p className="text-xs text-slate-500">Private school, EMIS, phone, machine, and image records.</p>
             </div>
           </div>
 
@@ -158,7 +167,7 @@ export default function AdminRecords({ onBack }) {
 
       {records && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {totals.map((item) => (
               <div key={item.label} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
                 <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">{item.label}</p>
@@ -173,7 +182,9 @@ export default function AdminRecords({ onBack }) {
                 <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-400">
                   <tr>
                     <th className="px-4 py-3 font-black">EMIS</th>
+                    <th className="px-4 py-3 font-black">School</th>
                     <th className="px-4 py-3 font-black">Phone</th>
+                    <th className="px-4 py-3 font-black">Machine</th>
                     <th className="px-4 py-3 font-black">Sessions</th>
                     <th className="px-4 py-3 font-black">Photos</th>
                     <th className="px-4 py-3 font-black">First Session</th>
@@ -186,7 +197,21 @@ export default function AdminRecords({ onBack }) {
                   {schools.map((row) => (
                     <tr key={row.emis_code} className="hover:bg-slate-50/70 transition-colors">
                       <td className="px-4 py-3 font-mono font-bold text-slate-800">{row.emis_code}</td>
+                      <td className="px-4 py-3 text-xs font-semibold text-slate-700 min-w-44">
+                        <span className="block max-w-52 truncate" title={row.school_name || ''}>
+                          {row.school_name || 'N/A'}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 font-mono text-slate-700">{row.phone_number}</td>
+                      <td className="px-4 py-3 min-w-52">
+                        <p className="text-xs font-semibold text-slate-700">{row.machine_type || 'N/A'}</p>
+                        <p className="mt-0.5 max-w-52 truncate font-mono text-[10px] text-slate-400" title={row.machine_id || ''}>
+                          {row.machine_id || 'No machine ID'}
+                        </p>
+                        <p className="mt-1 text-[10px] font-bold text-punjab-green">
+                          {row.machine_count || 0} machine{Number(row.machine_count || 0) === 1 ? '' : 's'}
+                        </p>
+                      </td>
                       <td className="px-4 py-3">
                         <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-punjab-blue">
                           {row.session_count || 0}

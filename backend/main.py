@@ -134,7 +134,10 @@ def is_session_expired(session: dict) -> bool:
 @app.post("/api/session")
 def api_create_session(
     emis_code: str = Form(...),
-    phone_number: str = Form(...)
+    phone_number: str = Form(...),
+    school_name: str = Form(default=""),
+    machine_id: str = Form(default=""),
+    machine_type: str = Form(default="")
 ):
     """
     Creates a new user session.
@@ -162,8 +165,27 @@ def api_create_session(
                 "ur": "غلط فون نمبر۔ براہ کرم درست 10 سے 15 ہندسوں کا نمبر درج کریں۔"
             }
         )
-        
-    session = create_session(emis_cleaned, phone_number)
+
+    school_name_cleaned = " ".join((school_name or "").strip().split())[:120]
+    machine_id_cleaned = (machine_id or "").strip()[:80]
+    machine_type_cleaned = " ".join((machine_type or "").strip().split())[:120]
+
+    if school_name and len(school_name_cleaned) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "en": "School Name must be at least 2 characters.",
+                "ur": "School Name must be at least 2 characters."
+            }
+        )
+
+    session = create_session(
+        emis_cleaned,
+        phone_number,
+        school_name_cleaned,
+        machine_id_cleaned,
+        machine_type_cleaned,
+    )
     return session
 
 
