@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, Database, Download, LockKeyhole, RefreshCw, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Database, Download, LockKeyhole, MessageSquareText, RefreshCw, ShieldCheck, Star } from 'lucide-react';
 import { getApiUrl } from '../utils/api';
 import { getApiErrorMessage } from '../utils/apiErrors';
 
@@ -68,11 +68,13 @@ export default function AdminRecords({ onBack }) {
   const [loading, setLoading] = useState(false);
 
   const schools = records?.schools || records?.sessions || [];
+  const feedback = records?.feedback || [];
   const totals = useMemo(() => ([
     { label: 'Schools', value: records?.total_schools || 0 },
     { label: 'Sessions', value: records?.total_sessions || 0 },
     { label: 'Machines', value: records?.total_machines || 0 },
     { label: 'Photos', value: records?.total_images || 0 },
+    { label: 'Feedback', value: records?.total_feedback || 0 },
   ]), [records]);
 
   const fetchRecords = async (event) => {
@@ -167,13 +169,85 @@ export default function AdminRecords({ onBack }) {
 
       {records && (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             {totals.map((item) => (
               <div key={item.label} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
                 <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">{item.label}</p>
                 <p className="mt-1 text-3xl font-black text-slate-800">{item.value}</p>
               </div>
             ))}
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-punjab-blue">
+                  <MessageSquareText size={19} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-800">Software Feedback</h3>
+                  <p className="text-xs font-semibold text-slate-400">
+                    Latest improvement messages submitted by schools.
+                  </p>
+                </div>
+              </div>
+              <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-black text-slate-500">
+                {feedback.length} latest
+              </span>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {feedback.map((item) => (
+                <div key={item.id} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-sm font-black text-slate-800">EMIS {item.emis_code}</span>
+                        {item.school_name && (
+                          <span className="max-w-72 truncate rounded-full bg-white px-2 py-1 text-[10px] font-bold text-slate-500" title={item.school_name}>
+                            {item.school_name}
+                          </span>
+                        )}
+                        {item.category && (
+                          <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-punjab-blue">
+                            {item.category}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-700">
+                        {item.message}
+                      </p>
+                    </div>
+
+                    <div className="shrink-0 text-left md:text-right">
+                      <div className="flex md:justify-end gap-0.5 text-amber-400">
+                        {[1, 2, 3, 4, 5].map((value) => (
+                          <Star
+                            key={value}
+                            size={13}
+                            fill={Number(item.rating || 0) >= value ? 'currentColor' : 'none'}
+                            className={Number(item.rating || 0) >= value ? 'text-amber-400' : 'text-slate-300'}
+                          />
+                        ))}
+                      </div>
+                      <p className="mt-2 font-mono text-xs font-bold text-slate-600">{item.phone_number}</p>
+                      <p className="mt-1 text-[10px] font-semibold text-slate-400">{formatDate(item.created_at)}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold text-slate-400">
+                    <span>{item.machine_type || 'Unknown machine'}</span>
+                    {item.machine_id && <span className="max-w-xs truncate font-mono">ID: {item.machine_id}</span>}
+                  </div>
+                </div>
+              ))}
+
+              {!feedback.length && (
+                <div className="rounded-xl border border-dashed border-slate-200 px-5 py-8 text-center text-sm font-semibold text-slate-400">
+                  No feedback submitted yet.
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="bg-white border border-slate-100 shadow-xl rounded-2xl overflow-hidden">

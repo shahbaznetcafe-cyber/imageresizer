@@ -115,6 +115,23 @@ def init_db():
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feedback_entries (
+                id BIGSERIAL PRIMARY KEY,
+                session_id BIGINT REFERENCES school_sessions(id) ON DELETE SET NULL,
+                emis_code TEXT NOT NULL,
+                phone_number TEXT NOT NULL,
+                school_name TEXT,
+                machine_id TEXT,
+                machine_type TEXT,
+                rating INTEGER NOT NULL DEFAULT 0,
+                category TEXT,
+                message TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
     else:
         cursor.execute(
             """
@@ -127,6 +144,24 @@ def init_db():
                 machine_type TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 processed_count INTEGER DEFAULT 0
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feedback_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER,
+                emis_code TEXT NOT NULL,
+                phone_number TEXT NOT NULL,
+                school_name TEXT,
+                machine_id TEXT,
+                machine_type TEXT,
+                rating INTEGER DEFAULT 0,
+                category TEXT,
+                message TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES school_sessions(id) ON DELETE SET NULL
             )
             """
         )
@@ -177,6 +212,24 @@ def init_db():
         """
         CREATE INDEX IF NOT EXISTS idx_school_sessions_machine_id
         ON school_sessions(machine_id)
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_feedback_entries_created_at
+        ON feedback_entries(created_at)
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_feedback_entries_emis_code
+        ON feedback_entries(emis_code)
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_feedback_entries_session_id
+        ON feedback_entries(session_id)
         """
     )
     conn.commit()
@@ -341,6 +394,77 @@ def record_processed_images(session: dict, processed_images: list[dict]) -> None
     conn.close()
 
 
+def record_feedback(session: dict, rating: int, category: str, message: str) -> dict:
+    """Stores feedback with the current school's private session details."""
+    conn = _connect()
+    cursor = conn.cursor()
+
+    rating_value = max(0, min(int(rating or 0), 5))
+    category_value = (category or "").strip()[:60]
+    message_value = (message or "").strip()[:1500]
+
+    if IS_POSTGRES:
+        cursor.execute(
+            """
+            INSERT INTO feedback_entries (
+                session_id, emis_code, phone_number, school_name, machine_id,
+                machine_type, rating, category, message
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, session_id, emis_code, phone_number, school_name,
+                machine_id, machine_type, rating, category, message, created_at
+            """,
+            (
+                session["id"],
+                session["emis_code"],
+                session["phone_number"],
+                session.get("school_name") or "",
+                session.get("machine_id") or "",
+                session.get("machine_type") or "",
+                rating_value,
+                category_value,
+                message_value,
+            ),
+        )
+        row = cursor.fetchone()
+    else:
+        cursor.execute(
+            """
+            INSERT INTO feedback_entries (
+                session_id, emis_code, phone_number, school_name, machine_id,
+                machine_type, rating, category, message
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                session["id"],
+                session["emis_code"],
+                session["phone_number"],
+                session.get("school_name") or "",
+                session.get("machine_id") or "",
+                session.get("machine_type") or "",
+                rating_value,
+                category_value,
+                message_value,
+            ),
+        )
+        feedback_id = cursor.lastrowid
+        cursor.execute(
+            """
+            SELECT id, session_id, emis_code, phone_number, school_name,
+                machine_id, machine_type, rating, category, message, created_at
+            FROM feedback_entries
+            WHERE id = ?
+            """,
+            (feedback_id,),
+        )
+        row = cursor.fetchone()
+
+    conn.commit()
+    conn.close()
+    return _row_to_dict(row)
+
+
 def get_activity_summary(limit: int = 8) -> dict:
     """Returns live landing-page stats without exposing phone numbers."""
     conn = _connect()
@@ -416,6 +540,9 @@ def get_admin_records(limit: int = 500) -> dict:
     cursor.execute("SELECT COUNT(DISTINCT machine_id) AS total_machines FROM school_sessions WHERE COALESCE(machine_id, '') <> ''")
     total_machines = _row_to_dict(cursor.fetchone())["total_machines"]
 
+    cursor.execute("SELECT COUNT(*) AS total_feedback FROM feedback_entries")
+    total_feedback = _row_to_dict(cursor.fetchone())["total_feedback"]
+
     cursor.execute(
         f"""
         WITH school_rollup AS (
@@ -489,12 +616,26 @@ def get_admin_records(limit: int = 500) -> dict:
     )
     schools = [_row_to_dict(row) for row in cursor.fetchall()]
 
+    cursor.execute(
+        f"""
+        SELECT id, session_id, emis_code, phone_number, school_name, machine_id,
+            machine_type, rating, category, message, created_at
+        FROM feedback_entries
+        ORDER BY created_at DESC, id DESC
+        LIMIT {limit_placeholder}
+        """,
+        (min(limit, 100),),
+    )
+    feedback = [_row_to_dict(row) for row in cursor.fetchall()]
+
     conn.close()
     return {
         "total_sessions": int(total_sessions or 0),
         "total_schools": int(total_schools or 0),
         "total_images": int(total_images or 0),
         "total_machines": int(total_machines or 0),
+        "total_feedback": int(total_feedback or 0),
         "schools": schools,
         "sessions": schools,
+        "feedback": feedback,
     }

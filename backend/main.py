@@ -19,6 +19,7 @@ try:
         get_activity_summary,
         get_admin_records,
         get_session,
+        record_feedback,
         record_processed_images,
         update_processed_count,
         DATABASE_BACKEND,
@@ -31,6 +32,7 @@ except ImportError:
         get_activity_summary,
         get_admin_records,
         get_session,
+        record_feedback,
         record_processed_images,
         update_processed_count,
         DATABASE_BACKEND,
@@ -201,6 +203,35 @@ def api_admin_records(x_admin_key: str = Header(default="")):
     if not ADMIN_KEY or x_admin_key != ADMIN_KEY:
         raise HTTPException(status_code=401, detail="Invalid admin key.")
     return get_admin_records()
+
+
+@app.post("/api/feedback")
+def api_feedback(
+    session_id: int = Form(...),
+    rating: int = Form(default=0),
+    category: str = Form(default=""),
+    message: str = Form(...),
+):
+    """Stores school/operator feedback for the admin dashboard."""
+    session = get_session(session_id)
+    if not session or is_session_expired(session):
+        raise HTTPException(
+            status_code=404,
+            detail="Session expired. Please log in again before sending feedback.",
+        )
+
+    clean_message = (message or "").strip()
+    if len(clean_message) < 5:
+        raise HTTPException(status_code=400, detail="Please write at least 5 characters.")
+
+    feedback = record_feedback(
+        session=session,
+        rating=rating,
+        category=category,
+        message=clean_message,
+    )
+    return {"success": True, "feedback": feedback}
+
 
 @app.post("/api/process-images")
 async def api_process_images(

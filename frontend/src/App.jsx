@@ -8,6 +8,7 @@ import ResultGallery from './components/ResultGallery';
 import FooterBranding from './components/FooterBranding';
 import AdminRecords from './components/AdminRecords';
 import SBZTrafficStrip from './components/SBZTrafficStrip';
+import FeedbackDialog from './components/FeedbackDialog';
 import { getApiErrorMessage, getNetworkErrorMessage } from './utils/apiErrors';
 import { getApiUrl } from './utils/api';
 
@@ -332,6 +333,10 @@ export default function App() {
             </>
           )}
         </div>
+
+        {session && !showAdmin && step !== 'login' && step !== 'processing' && (
+          <FeedbackDialog session={session} />
+        )}
       </main>
 
       {/* Footer credits */}

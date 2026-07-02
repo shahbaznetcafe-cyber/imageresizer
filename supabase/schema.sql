@@ -24,6 +24,20 @@ CREATE TABLE IF NOT EXISTS public.processed_images (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.feedback_entries (
+  id BIGSERIAL PRIMARY KEY,
+  session_id BIGINT REFERENCES public.school_sessions(id) ON DELETE SET NULL,
+  emis_code TEXT NOT NULL,
+  phone_number TEXT NOT NULL,
+  school_name TEXT,
+  machine_id TEXT,
+  machine_type TEXT,
+  rating INTEGER NOT NULL DEFAULT 0,
+  category TEXT,
+  message TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 ALTER TABLE public.school_sessions
   ADD COLUMN IF NOT EXISTS school_name TEXT,
   ADD COLUMN IF NOT EXISTS machine_id TEXT,
@@ -52,10 +66,22 @@ CREATE INDEX IF NOT EXISTS idx_processed_images_emis_code
 CREATE INDEX IF NOT EXISTS idx_processed_images_session_id
   ON public.processed_images(session_id);
 
+CREATE INDEX IF NOT EXISTS idx_feedback_entries_created_at
+  ON public.feedback_entries(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_feedback_entries_emis_code
+  ON public.feedback_entries(emis_code);
+
+CREATE INDEX IF NOT EXISTS idx_feedback_entries_session_id
+  ON public.feedback_entries(session_id);
+
 ALTER TABLE public.school_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.processed_images ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.feedback_entries ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON TABLE public.school_sessions FROM anon, authenticated;
 REVOKE ALL ON TABLE public.processed_images FROM anon, authenticated;
+REVOKE ALL ON TABLE public.feedback_entries FROM anon, authenticated;
 REVOKE ALL ON SEQUENCE public.school_sessions_id_seq FROM anon, authenticated;
 REVOKE ALL ON SEQUENCE public.processed_images_id_seq FROM anon, authenticated;
+REVOKE ALL ON SEQUENCE public.feedback_entries_id_seq FROM anon, authenticated;
