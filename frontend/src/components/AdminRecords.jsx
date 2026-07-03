@@ -1,5 +1,17 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, Database, Download, LockKeyhole, MessageSquareText, RefreshCw, ShieldCheck, Star } from 'lucide-react';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Database,
+  Download,
+  LockKeyhole,
+  MessageSquareText,
+  RefreshCw,
+  Save,
+  ShieldAlert,
+  ShieldCheck,
+  Star,
+} from 'lucide-react';
 import { getApiUrl } from '../utils/api';
 import { getApiErrorMessage } from '../utils/apiErrors';
 
@@ -61,19 +73,115 @@ function downloadCsv(rows) {
   URL.revokeObjectURL(url);
 }
 
+function LimitRequestCard({ item, device, saving, onApprove }) {
+  const suggestedLimit = Number(device?.photo_limit || 50) + Number(item.requested_extra || 50);
+  const [nextLimit, setNextLimit] = useState(suggestedLimit);
+  const remaining = Math.max(Number(device?.photo_limit || 0) - Number(device?.photos_used || 0), 0);
+  const isPending = item.status === 'pending';
+
+  return (
+    <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4">
+      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-sm font-black text-slate-800">EMIS {item.emis_code}</span>
+            <span className={`rounded-full px-2 py-1 text-[10px] font-black ${
+              isPending ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+            }`}>
+              {item.status}
+            </span>
+            {item.school_name && (
+              <span className="max-w-64 truncate rounded-full bg-white px-2 py-1 text-[10px] font-bold text-slate-500" title={item.school_name}>
+                {item.school_name}
+              </span>
+            )}
+          </div>
+
+          <p className="mt-2 text-xs font-semibold text-slate-500">
+            Phone <span className="font-mono text-slate-700">{item.phone_number}</span>
+            <span className="mx-2 text-slate-300">|</span>
+            Requested +{item.requested_extra || 50} photos
+            <span className="mx-2 text-slate-300">|</span>
+            {formatDate(item.created_at)}
+          </p>
+
+          {item.message && (
+            <p className="mt-3 whitespace-pre-wrap rounded-xl bg-white px-3 py-2 text-sm font-semibold leading-6 text-slate-700">
+              {item.message}
+            </p>
+          )}
+
+          <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold text-slate-400">
+            <span>{device?.machine_type || item.machine_type || 'Unknown machine'}</span>
+            {item.machine_id && <span className="max-w-xs truncate font-mono">Machine: {item.machine_id}</span>}
+            {item.ip_address && <span className="font-mono">IP: {item.ip_address}</span>}
+          </div>
+        </div>
+
+        <div className="w-full lg:w-72 rounded-2xl border border-white bg-white p-3 shadow-sm">
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-xl bg-slate-50 p-2">
+              <p className="text-[9px] font-black uppercase text-slate-400">Limit</p>
+              <p className="font-mono text-sm font-black text-slate-800">{device?.photo_limit || 50}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-2">
+              <p className="text-[9px] font-black uppercase text-slate-400">Used</p>
+              <p className="font-mono text-sm font-black text-amber-600">{device?.photos_used || 0}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-2">
+              <p className="text-[9px] font-black uppercase text-slate-400">Left</p>
+              <p className="font-mono text-sm font-black text-punjab-green">{remaining}</p>
+            </div>
+          </div>
+
+          <div className="mt-3 flex gap-2">
+            <input
+              type="number"
+              min="0"
+              max="100000"
+              value={nextLimit}
+              onChange={(event) => setNextLimit(event.target.value)}
+              disabled={!isPending || saving}
+              className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs font-black text-slate-700 outline-none focus:border-punjab-green focus:ring-4 focus:ring-green-50 disabled:opacity-60"
+            />
+            <button
+              type="button"
+              disabled={!isPending || saving || !device?.id}
+              onClick={() => onApprove(device.id, nextLimit, item.id)}
+              className="inline-flex items-center justify-center gap-1 rounded-xl bg-punjab-green px-3 py-2 text-xs font-black text-white transition-colors hover:bg-punjab-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+              Set
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminRecords({ onBack }) {
   const [adminKey, setAdminKey] = useState(() => window.sessionStorage.getItem('pectaa-admin-key') || '');
   const [records, setRecords] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [savingLimit, setSavingLimit] = useState(null);
 
-  const schools = records?.schools || records?.sessions || [];
-  const feedback = records?.feedback || [];
+  const schools = useMemo(() => records?.schools || records?.sessions || [], [records]);
+  const feedback = useMemo(() => records?.feedback || [], [records]);
+  const limitRequests = useMemo(() => records?.limit_requests || [], [records]);
+  const deviceLimits = useMemo(() => records?.device_limits || [], [records]);
+  const deviceById = useMemo(() => {
+    const map = new Map();
+    deviceLimits.forEach((item) => map.set(Number(item.id), item));
+    return map;
+  }, [deviceLimits]);
   const totals = useMemo(() => ([
     { label: 'Schools', value: records?.total_schools || 0 },
     { label: 'Sessions', value: records?.total_sessions || 0 },
     { label: 'Machines', value: records?.total_machines || 0 },
     { label: 'Photos', value: records?.total_images || 0 },
+    { label: 'Limit Requests', value: records?.total_limit_requests || 0 },
     { label: 'Feedback', value: records?.total_feedback || 0 },
   ]), [records]);
 
@@ -100,6 +208,36 @@ export default function AdminRecords({ onBack }) {
       setError(err.message || 'Unable to load records.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const approveLimitRequest = async (deviceLimitId, photoLimit, requestId) => {
+    setError('');
+    setSavingLimit(requestId);
+
+    const formData = new FormData();
+    formData.append('device_limit_id', String(deviceLimitId));
+    formData.append('photo_limit', String(photoLimit));
+    formData.append('request_id', String(requestId));
+
+    try {
+      const response = await fetch(getApiUrl('/api/admin/device-limit'), {
+        method: 'POST',
+        headers: {
+          'X-Admin-Key': adminKey.trim(),
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(await getApiErrorMessage(response, 'Unable to update device limit.'));
+      }
+
+      await fetchRecords();
+    } catch (err) {
+      setError(err.message || 'Unable to update device limit.');
+    } finally {
+      setSavingLimit(null);
     }
   };
 
@@ -169,13 +307,51 @@ export default function AdminRecords({ onBack }) {
 
       {records && (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
             {totals.map((item) => (
               <div key={item.label} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
                 <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">{item.label}</p>
                 <p className="mt-1 text-3xl font-black text-slate-800">{item.value}</p>
               </div>
             ))}
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                  <ShieldAlert size={19} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-800">Photo Limit Requests</h3>
+                  <p className="text-xs font-semibold text-slate-400">
+                    Schools that reached the 50-photo lifetime device quota.
+                  </p>
+                </div>
+              </div>
+              <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
+                {records.total_limit_requests || 0} pending
+              </span>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {limitRequests.map((item) => (
+                <LimitRequestCard
+                  key={item.id}
+                  item={item}
+                  device={deviceById.get(Number(item.device_limit_id))}
+                  saving={savingLimit === item.id}
+                  onApprove={approveLimitRequest}
+                />
+              ))}
+
+              {!limitRequests.length && (
+                <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 px-5 py-8 text-center text-sm font-semibold text-slate-400">
+                  <CheckCircle2 size={16} />
+                  No photo limit requests yet.
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xl">

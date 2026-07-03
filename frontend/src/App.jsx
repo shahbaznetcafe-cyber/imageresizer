@@ -9,6 +9,7 @@ import FooterBranding from './components/FooterBranding';
 import AdminRecords from './components/AdminRecords';
 import SBZTrafficStrip from './components/SBZTrafficStrip';
 import FeedbackDialog from './components/FeedbackDialog';
+import LimitRequestForm from './components/LimitRequestForm';
 import { getApiErrorMessage, getNetworkErrorMessage } from './utils/apiErrors';
 import { getApiUrl } from './utils/api';
 
@@ -107,6 +108,7 @@ export default function App() {
   const [zipUrl, setZipUrl] = useState(null);
   const [error, setError] = useState(null);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [quotaRestriction, setQuotaRestriction] = useState(null);
 
   useEffect(() => {
     const cachedSession = loadCachedSession();
@@ -119,6 +121,7 @@ export default function App() {
 
   const handleLoginSuccess = (sessionData) => {
     setSession(sessionData);
+    setQuotaRestriction(null);
     storeCachedSession(sessionData);
     warmBackendProcessor();
     setStep('upload');
@@ -156,6 +159,28 @@ export default function App() {
       );
 
       if (!response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const payload = await response.json();
+          const detail = payload?.detail;
+          if (detail?.code === 'quota_limit' || detail?.code === 'blocked') {
+            setQuotaRestriction(detail);
+            setSession(prev => {
+              const updatedSession = {
+                ...prev,
+                quota: detail.quota,
+              };
+              storeCachedSession(updatedSession);
+              return updatedSession;
+            });
+            setError(null);
+            setStep('upload');
+            return;
+          }
+
+          const detailMessage = typeof detail === 'string' ? detail : detail?.en;
+          throw new Error(detailMessage || 'Processing failed. Please check backend connection.');
+        }
         throw new Error(await getApiErrorMessage(response, 'Processing failed. Please check backend connection.'));
       }
 
@@ -168,7 +193,8 @@ export default function App() {
       setSession(prev => {
         const updatedSession = {
           ...prev,
-          processed_count: data.total_session_count
+          processed_count: data.total_session_count,
+          quota: data.quota || prev.quota,
         };
         storeCachedSession(updatedSession);
         return updatedSession;
@@ -203,6 +229,7 @@ export default function App() {
     setFailedImages([]);
     setZipUrl(null);
     setError(null);
+    setQuotaRestriction(null);
     setStep('upload');
   };
 
@@ -210,8 +237,15 @@ export default function App() {
     handleReset();
     clearCachedSession();
     setSession(null);
+    setQuotaRestriction(null);
     setStep('login');
   };
+
+  const activeQuota = quotaRestriction?.quota || session?.quota;
+  const quotaReached = Boolean(
+    activeQuota
+    && (activeQuota.blocked || Number(activeQuota.remaining ?? 1) <= 0)
+  );
 
   // Progress Stepper steps
   const stepsList = [
@@ -319,7 +353,13 @@ export default function App() {
                   onAdminOpen={() => setShowAdmin(true)}
                 />
               )}
-              {step === 'upload' && <UploadArea onFilesSelected={handleFilesSelected} />}
+              {step === 'upload' && (
+                quotaReached ? (
+                  <LimitRequestForm session={session} quota={activeQuota} />
+                ) : (
+                  <UploadArea onFilesSelected={handleFilesSelected} />
+                )
+              )}
               {step === 'crop' && <CropEditor files={uploadedFiles} onCroppingDone={handleCroppingDone} />}
               {step === 'processing' && <ProcessingStatus files={croppedFiles} />}
               {step === 'result' && (

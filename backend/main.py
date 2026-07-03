@@ -5,7 +5,7 @@ import uuid
 import zipfile
 from typing import List
 from datetime import datetime, timedelta
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Header
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
@@ -19,8 +19,13 @@ try:
         get_activity_summary,
         get_admin_records,
         get_session,
+        add_device_usage,
+        check_device_quota,
+        create_limit_request,
+        get_or_create_device_limit,
         record_feedback,
         record_processed_images,
+        update_device_limit,
         update_processed_count,
         DATABASE_BACKEND,
     )
@@ -32,8 +37,13 @@ except ImportError:
         get_activity_summary,
         get_admin_records,
         get_session,
+        add_device_usage,
+        check_device_quota,
+        create_limit_request,
+        get_or_create_device_limit,
         record_feedback,
         record_processed_images,
+        update_device_limit,
         update_processed_count,
         DATABASE_BACKEND,
     )
@@ -133,8 +143,22 @@ def is_session_expired(session: dict) -> bool:
 
     return datetime.utcnow() - created_at > timedelta(hours=SESSION_TTL_HOURS)
 
+
+def get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()[:80]
+    return (
+        request.headers.get("cf-connecting-ip")
+        or request.headers.get("x-real-ip")
+        or (request.client.host if request.client else "")
+        or ""
+    )[:80]
+
+
 @app.post("/api/session")
 def api_create_session(
+    request: Request,
     emis_code: str = Form(...),
     phone_number: str = Form(...),
     school_name: str = Form(default=""),
@@ -171,6 +195,7 @@ def api_create_session(
     school_name_cleaned = " ".join((school_name or "").strip().split())[:120]
     machine_id_cleaned = (machine_id or "").strip()[:80]
     machine_type_cleaned = " ".join((machine_type or "").strip().split())[:120]
+    ip_address = get_client_ip(request)
 
     if school_name and len(school_name_cleaned) < 2:
         raise HTTPException(
@@ -181,13 +206,35 @@ def api_create_session(
             }
         )
 
-    session = create_session(
+    device_result = get_or_create_device_limit(
         emis_cleaned,
-        phone_number,
+        phone_cleaned,
         school_name_cleaned,
         machine_id_cleaned,
         machine_type_cleaned,
+        ip_address,
     )
+    if not device_result["allowed"]:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "device_locked",
+                "en": device_result["message"],
+                "ur": device_result["message"],
+                "quota": device_result.get("quota", {}),
+            },
+        )
+
+    session = create_session(
+        emis_cleaned,
+        phone_cleaned,
+        school_name_cleaned,
+        machine_id_cleaned,
+        machine_type_cleaned,
+        ip_address,
+        device_result["device"]["id"],
+    )
+    session["quota"] = device_result["quota"]
     return session
 
 
@@ -233,6 +280,37 @@ def api_feedback(
     return {"success": True, "feedback": feedback}
 
 
+@app.post("/api/limit-request")
+def api_limit_request(
+    session_id: int = Form(...),
+    requested_extra: int = Form(default=50),
+    message: str = Form(default=""),
+):
+    """Stores a quota increase request after the free limit is reached."""
+    session = get_session(session_id)
+    if not session or is_session_expired(session):
+        raise HTTPException(status_code=404, detail="Session expired. Please log in again.")
+
+    limit_request = create_limit_request(session, requested_extra, message)
+    return {"success": True, "request": limit_request}
+
+
+@app.post("/api/admin/device-limit")
+def api_admin_device_limit(
+    device_limit_id: int = Form(...),
+    photo_limit: int = Form(...),
+    request_id: int | None = Form(default=None),
+    x_admin_key: str = Header(default=""),
+):
+    """Allows admin to increase or reset a device photo quota."""
+    if not ADMIN_KEY or x_admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=401, detail="Invalid admin key.")
+    device = update_device_limit(device_limit_id, photo_limit, request_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="Device limit record not found.")
+    return {"success": True, "device": device}
+
+
 @app.post("/api/process-images")
 async def api_process_images(
     background_tasks: BackgroundTasks,
@@ -263,6 +341,18 @@ async def api_process_images(
                 "en": "You must upload between 1 and 10 images.",
                 "ur": "آپ کو 1 سے 10 تصاویر اپ لوڈ کرنی چاہئیں۔"
             }
+        )
+
+    quota_check = check_device_quota(session, len(files))
+    if not quota_check["allowed"]:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": quota_check["reason"],
+                "en": quota_check["message"],
+                "ur": quota_check["message"],
+                "quota": quota_check["quota"],
+            },
         )
         
     # Schedule folder cleanup as a background task
@@ -361,12 +451,14 @@ async def api_process_images(
     # 5. Save image records and update processed count in database
     record_processed_images(session, processed_images)
     new_count = update_processed_count(session_id, len(processed_images))
+    quota = add_device_usage(session.get("device_limit_id"), len(processed_images))
     
     return {
         "success": len(processed_images) > 0,
         "processed_count": len(processed_images),
         "failed_count": len(failed_images),
         "total_session_count": new_count,
+        "quota": quota,
         "images": processed_images,
         "failed_images": failed_images,
         "zip_url": zip_url,

@@ -4,6 +4,8 @@ import tempfile
 from datetime import date, datetime
 from decimal import Decimal
 
+DEFAULT_PHOTO_LIMIT = int(os.getenv("DEFAULT_PHOTO_LIMIT", "50"))
+
 DEFAULT_DATABASE_FILE = (
     os.path.join(tempfile.gettempdir(), "school_sessions.db")
     if os.getenv("VERCEL")
@@ -92,6 +94,8 @@ def init_db():
                 school_name TEXT,
                 machine_id TEXT,
                 machine_type TEXT,
+                ip_address TEXT,
+                device_limit_id BIGINT,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 processed_count INTEGER NOT NULL DEFAULT 0
             )
@@ -107,6 +111,8 @@ def init_db():
                 school_name TEXT,
                 machine_id TEXT,
                 machine_type TEXT,
+                ip_address TEXT,
+                device_limit_id BIGINT,
                 original_name TEXT NOT NULL,
                 processed_name TEXT NOT NULL,
                 url TEXT NOT NULL,
@@ -132,6 +138,44 @@ def init_db():
             )
             """
         )
+        cursor.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS device_limits (
+                id BIGSERIAL PRIMARY KEY,
+                machine_id TEXT,
+                ip_address TEXT,
+                emis_code TEXT NOT NULL,
+                phone_number TEXT NOT NULL,
+                school_name TEXT,
+                machine_type TEXT,
+                photo_limit INTEGER NOT NULL DEFAULT {DEFAULT_PHOTO_LIMIT},
+                photos_used INTEGER NOT NULL DEFAULT 0,
+                blocked BOOLEAN NOT NULL DEFAULT FALSE,
+                block_reason TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS limit_requests (
+                id BIGSERIAL PRIMARY KEY,
+                session_id BIGINT REFERENCES school_sessions(id) ON DELETE SET NULL,
+                device_limit_id BIGINT REFERENCES device_limits(id) ON DELETE SET NULL,
+                machine_id TEXT,
+                ip_address TEXT,
+                emis_code TEXT NOT NULL,
+                phone_number TEXT NOT NULL,
+                school_name TEXT,
+                requested_extra INTEGER NOT NULL DEFAULT 50,
+                message TEXT,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                resolved_at TIMESTAMPTZ
+            )
+            """
+        )
     else:
         cursor.execute(
             """
@@ -142,6 +186,8 @@ def init_db():
                 school_name TEXT,
                 machine_id TEXT,
                 machine_type TEXT,
+                ip_address TEXT,
+                device_limit_id INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 processed_count INTEGER DEFAULT 0
             )
@@ -175,6 +221,8 @@ def init_db():
                 school_name TEXT,
                 machine_id TEXT,
                 machine_type TEXT,
+                ip_address TEXT,
+                device_limit_id INTEGER,
                 original_name TEXT NOT NULL,
                 processed_name TEXT NOT NULL,
                 url TEXT NOT NULL,
@@ -184,11 +232,53 @@ def init_db():
             )
             """
         )
+        cursor.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS device_limits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                machine_id TEXT,
+                ip_address TEXT,
+                emis_code TEXT NOT NULL,
+                phone_number TEXT NOT NULL,
+                school_name TEXT,
+                machine_type TEXT,
+                photo_limit INTEGER DEFAULT {DEFAULT_PHOTO_LIMIT},
+                photos_used INTEGER DEFAULT 0,
+                blocked INTEGER DEFAULT 0,
+                block_reason TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS limit_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER,
+                device_limit_id INTEGER,
+                machine_id TEXT,
+                ip_address TEXT,
+                emis_code TEXT NOT NULL,
+                phone_number TEXT NOT NULL,
+                school_name TEXT,
+                requested_extra INTEGER DEFAULT 50,
+                message TEXT,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                resolved_at TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES school_sessions(id) ON DELETE SET NULL,
+                FOREIGN KEY (device_limit_id) REFERENCES device_limits(id) ON DELETE SET NULL
+            )
+            """
+        )
 
     for table_name in ("school_sessions", "processed_images"):
         _ensure_column(cursor, table_name, "school_name", "TEXT")
         _ensure_column(cursor, table_name, "machine_id", "TEXT")
         _ensure_column(cursor, table_name, "machine_type", "TEXT")
+        _ensure_column(cursor, table_name, "ip_address", "TEXT")
+        _ensure_column(cursor, table_name, "device_limit_id", "BIGINT" if IS_POSTGRES else "INTEGER")
 
     cursor.execute(
         """
@@ -232,8 +322,279 @@ def init_db():
         ON feedback_entries(session_id)
         """
     )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_device_limits_machine_id
+        ON device_limits(machine_id)
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_device_limits_ip_address
+        ON device_limits(ip_address)
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_limit_requests_status
+        ON limit_requests(status)
+        """
+    )
+    _bootstrap_device_limits(cursor)
     conn.commit()
     conn.close()
+
+
+def _bootstrap_device_limits(cursor) -> None:
+    """Creates quota rows for historical machines so old heavy users are limited."""
+    if IS_POSTGRES:
+        cursor.execute(
+            """
+            INSERT INTO device_limits (
+                machine_id, ip_address, emis_code, phone_number, school_name,
+                machine_type, photo_limit, photos_used
+            )
+            SELECT
+                s.machine_id,
+                MAX(NULLIF(s.ip_address, '')) AS ip_address,
+                (ARRAY_AGG(s.emis_code ORDER BY s.created_at DESC, s.id DESC))[1] AS emis_code,
+                (ARRAY_AGG(s.phone_number ORDER BY s.created_at DESC, s.id DESC))[1] AS phone_number,
+                (ARRAY_AGG(NULLIF(s.school_name, '') ORDER BY s.created_at DESC, s.id DESC))[1] AS school_name,
+                (ARRAY_AGG(NULLIF(s.machine_type, '') ORDER BY s.created_at DESC, s.id DESC))[1] AS machine_type,
+                %s AS photo_limit,
+                COUNT(DISTINCT p.id) AS photos_used
+            FROM school_sessions s
+            LEFT JOIN processed_images p
+                ON p.machine_id = s.machine_id
+            WHERE COALESCE(s.machine_id, '') <> ''
+              AND NOT EXISTS (
+                SELECT 1 FROM device_limits d WHERE d.machine_id = s.machine_id
+              )
+            GROUP BY s.machine_id
+            """,
+            (DEFAULT_PHOTO_LIMIT,),
+        )
+        return
+
+    cursor.execute(
+        """
+        SELECT
+            s.machine_id,
+            MAX(NULLIF(s.ip_address, '')) AS ip_address,
+            MAX(s.emis_code) AS emis_code,
+            MAX(s.phone_number) AS phone_number,
+            MAX(NULLIF(s.school_name, '')) AS school_name,
+            MAX(NULLIF(s.machine_type, '')) AS machine_type,
+            COUNT(DISTINCT p.id) AS photos_used
+        FROM school_sessions s
+        LEFT JOIN processed_images p
+            ON p.machine_id = s.machine_id
+        WHERE COALESCE(s.machine_id, '') <> ''
+        GROUP BY s.machine_id
+        """
+    )
+    for row in cursor.fetchall():
+        row_data = _row_to_dict(row)
+        cursor.execute(
+            "SELECT 1 FROM device_limits WHERE machine_id = ? LIMIT 1",
+            (row_data["machine_id"],),
+        )
+        if cursor.fetchone():
+            continue
+        cursor.execute(
+            """
+            INSERT INTO device_limits (
+                machine_id, ip_address, emis_code, phone_number, school_name,
+                machine_type, photo_limit, photos_used
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                row_data["machine_id"],
+                row_data.get("ip_address") or "",
+                row_data["emis_code"],
+                row_data["phone_number"],
+                row_data.get("school_name") or "",
+                row_data.get("machine_type") or "",
+                DEFAULT_PHOTO_LIMIT,
+                int(row_data.get("photos_used") or 0),
+            ),
+        )
+
+
+def _quota_payload(device: dict | None) -> dict:
+    if not device:
+        return {
+            "device_limit_id": None,
+            "photo_limit": DEFAULT_PHOTO_LIMIT,
+            "photos_used": 0,
+            "remaining": DEFAULT_PHOTO_LIMIT,
+            "blocked": False,
+        }
+
+    photo_limit = int(device.get("photo_limit") or DEFAULT_PHOTO_LIMIT)
+    photos_used = int(device.get("photos_used") or 0)
+    return {
+        "device_limit_id": device.get("id"),
+        "photo_limit": photo_limit,
+        "photos_used": photos_used,
+        "remaining": max(photo_limit - photos_used, 0),
+        "blocked": bool(device.get("blocked")),
+        "block_reason": device.get("block_reason") or "",
+    }
+
+
+def _fetch_device_limits(cursor, machine_id: str = "", ip_address: str = "") -> list[dict]:
+    conditions = []
+    values = []
+
+    if machine_id:
+        conditions.append("machine_id = %s" if IS_POSTGRES else "machine_id = ?")
+        values.append(machine_id)
+    if ip_address:
+        conditions.append("ip_address = %s" if IS_POSTGRES else "ip_address = ?")
+        values.append(ip_address)
+
+    if not conditions:
+        return []
+
+    cursor.execute(
+        f"""
+        SELECT id, machine_id, ip_address, emis_code, phone_number, school_name,
+            machine_type, photo_limit, photos_used, blocked, block_reason,
+            created_at, updated_at
+        FROM device_limits
+        WHERE {" OR ".join(conditions)}
+        ORDER BY updated_at DESC, id DESC
+        """,
+        tuple(values),
+    )
+    return [_row_to_dict(row) for row in cursor.fetchall()]
+
+
+def get_or_create_device_limit(
+    emis_code: str,
+    phone_number: str,
+    school_name: str = "",
+    machine_id: str = "",
+    machine_type: str = "",
+    ip_address: str = "",
+) -> dict:
+    """Binds one device/IP to one school identity and returns quota details."""
+    conn = _connect()
+    cursor = conn.cursor()
+
+    machine_id = (machine_id or "").strip()[:120]
+    ip_address = (ip_address or "").strip()[:80]
+    phone_number = (phone_number or "").strip()
+
+    matches = _fetch_device_limits(cursor, machine_id, ip_address)
+    chosen = next((item for item in matches if item.get("machine_id") == machine_id and machine_id), None)
+    chosen = chosen or (matches[0] if matches else None)
+
+    if chosen:
+        same_school = chosen.get("emis_code") == emis_code and chosen.get("phone_number") == phone_number
+        if not same_school:
+            conn.close()
+            return {
+                "allowed": False,
+                "reason": "identity_mismatch",
+                "message": (
+                    "This device/IP is already registered for another school. "
+                    "Please use the original EMIS and phone number or contact admin."
+                ),
+                "quota": _quota_payload(chosen),
+                "device": chosen,
+            }
+
+        if IS_POSTGRES:
+            cursor.execute(
+                """
+                UPDATE device_limits
+                SET school_name = COALESCE(NULLIF(%s, ''), school_name),
+                    machine_type = COALESCE(NULLIF(%s, ''), machine_type),
+                    ip_address = COALESCE(NULLIF(%s, ''), ip_address),
+                    updated_at = NOW()
+                WHERE id = %s
+                RETURNING id, machine_id, ip_address, emis_code, phone_number,
+                    school_name, machine_type, photo_limit, photos_used, blocked,
+                    block_reason, created_at, updated_at
+                """,
+                (school_name, machine_type, ip_address, chosen["id"]),
+            )
+            row = cursor.fetchone()
+        else:
+            cursor.execute(
+                """
+                UPDATE device_limits
+                SET school_name = COALESCE(NULLIF(?, ''), school_name),
+                    machine_type = COALESCE(NULLIF(?, ''), machine_type),
+                    ip_address = COALESCE(NULLIF(?, ''), ip_address),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (school_name, machine_type, ip_address, chosen["id"]),
+            )
+            cursor.execute(
+                """
+                SELECT id, machine_id, ip_address, emis_code, phone_number,
+                    school_name, machine_type, photo_limit, photos_used, blocked,
+                    block_reason, created_at, updated_at
+                FROM device_limits
+                WHERE id = ?
+                """,
+                (chosen["id"],),
+            )
+            row = cursor.fetchone()
+
+        conn.commit()
+        device = _row_to_dict(row)
+        conn.close()
+        return {"allowed": True, "device": device, "quota": _quota_payload(device)}
+
+    if IS_POSTGRES:
+        cursor.execute(
+            """
+            INSERT INTO device_limits (
+                machine_id, ip_address, emis_code, phone_number, school_name,
+                machine_type, photo_limit
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, machine_id, ip_address, emis_code, phone_number,
+                school_name, machine_type, photo_limit, photos_used, blocked,
+                block_reason, created_at, updated_at
+            """,
+            (machine_id, ip_address, emis_code, phone_number, school_name, machine_type, DEFAULT_PHOTO_LIMIT),
+        )
+        row = cursor.fetchone()
+    else:
+        cursor.execute(
+            """
+            INSERT INTO device_limits (
+                machine_id, ip_address, emis_code, phone_number, school_name,
+                machine_type, photo_limit
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (machine_id, ip_address, emis_code, phone_number, school_name, machine_type, DEFAULT_PHOTO_LIMIT),
+        )
+        device_id = cursor.lastrowid
+        cursor.execute(
+            """
+            SELECT id, machine_id, ip_address, emis_code, phone_number,
+                school_name, machine_type, photo_limit, photos_used, blocked,
+                block_reason, created_at, updated_at
+            FROM device_limits
+            WHERE id = ?
+            """,
+            (device_id,),
+        )
+        row = cursor.fetchone()
+
+    conn.commit()
+    device = _row_to_dict(row)
+    conn.close()
+    return {"allowed": True, "device": device, "quota": _quota_payload(device)}
 
 
 def create_session(
@@ -242,6 +603,8 @@ def create_session(
     school_name: str = "",
     machine_id: str = "",
     machine_type: str = "",
+    ip_address: str = "",
+    device_limit_id: int | None = None,
 ) -> dict:
     """Creates a new session and returns it."""
     conn = _connect()
@@ -251,30 +614,32 @@ def create_session(
         cursor.execute(
             """
             INSERT INTO school_sessions (
-                emis_code, phone_number, school_name, machine_id, machine_type
+                emis_code, phone_number, school_name, machine_id, machine_type,
+                ip_address, device_limit_id
             )
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING id, emis_code, phone_number, school_name, machine_id,
-                machine_type, created_at, processed_count
+                machine_type, ip_address, device_limit_id, created_at, processed_count
             """,
-            (emis_code, phone_number, school_name, machine_id, machine_type),
+            (emis_code, phone_number, school_name, machine_id, machine_type, ip_address, device_limit_id),
         )
         row = cursor.fetchone()
     else:
         cursor.execute(
             """
             INSERT INTO school_sessions (
-                emis_code, phone_number, school_name, machine_id, machine_type
+                emis_code, phone_number, school_name, machine_id, machine_type,
+                ip_address, device_limit_id
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (emis_code, phone_number, school_name, machine_id, machine_type),
+            (emis_code, phone_number, school_name, machine_id, machine_type, ip_address, device_limit_id),
         )
         session_id = cursor.lastrowid
         cursor.execute(
             """
             SELECT id, emis_code, phone_number, school_name, machine_id,
-                machine_type, created_at, processed_count
+                machine_type, ip_address, device_limit_id, created_at, processed_count
             FROM school_sessions
             WHERE id = ?
             """,
@@ -325,7 +690,7 @@ def get_session(session_id: int) -> dict:
         cursor.execute(
             """
             SELECT id, emis_code, phone_number, school_name, machine_id,
-                machine_type, created_at, processed_count
+                machine_type, ip_address, device_limit_id, created_at, processed_count
             FROM school_sessions
             WHERE id = %s
             """,
@@ -335,7 +700,7 @@ def get_session(session_id: int) -> dict:
         cursor.execute(
             """
             SELECT id, emis_code, phone_number, school_name, machine_id,
-                machine_type, created_at, processed_count
+                machine_type, ip_address, device_limit_id, created_at, processed_count
             FROM school_sessions
             WHERE id = ?
             """,
@@ -358,18 +723,20 @@ def record_processed_images(session: dict, processed_images: list[dict]) -> None
         """
         INSERT INTO processed_images (
             session_id, emis_code, phone_number, school_name, machine_id,
-            machine_type, original_name, processed_name, url, size_kb
+            machine_type, ip_address, device_limit_id, original_name,
+            processed_name, url, size_kb
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         if IS_POSTGRES
         else
         """
         INSERT INTO processed_images (
             session_id, emis_code, phone_number, school_name, machine_id,
-            machine_type, original_name, processed_name, url, size_kb
+            machine_type, ip_address, device_limit_id, original_name,
+            processed_name, url, size_kb
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
     )
     cursor.executemany(
@@ -382,6 +749,8 @@ def record_processed_images(session: dict, processed_images: list[dict]) -> None
                 session.get("school_name") or "",
                 session.get("machine_id") or "",
                 session.get("machine_type") or "",
+                session.get("ip_address") or "",
+                session.get("device_limit_id"),
                 image["original_name"],
                 image["processed_name"],
                 image["url"],
@@ -392,6 +761,245 @@ def record_processed_images(session: dict, processed_images: list[dict]) -> None
     )
     conn.commit()
     conn.close()
+
+
+def get_device_quota(device_limit_id: int | None) -> dict:
+    if not device_limit_id:
+        return _quota_payload(None)
+
+    conn = _connect()
+    cursor = conn.cursor()
+    if IS_POSTGRES:
+        cursor.execute(
+            """
+            SELECT id, machine_id, ip_address, emis_code, phone_number,
+                school_name, machine_type, photo_limit, photos_used, blocked,
+                block_reason, created_at, updated_at
+            FROM device_limits
+            WHERE id = %s
+            """,
+            (device_limit_id,),
+        )
+    else:
+        cursor.execute(
+            """
+            SELECT id, machine_id, ip_address, emis_code, phone_number,
+                school_name, machine_type, photo_limit, photos_used, blocked,
+                block_reason, created_at, updated_at
+            FROM device_limits
+            WHERE id = ?
+            """,
+            (device_limit_id,),
+        )
+    device = _row_to_dict(cursor.fetchone())
+    conn.close()
+    return _quota_payload(device)
+
+
+def check_device_quota(session: dict, requested_count: int) -> dict:
+    quota = get_device_quota(session.get("device_limit_id"))
+    requested_count = int(requested_count or 0)
+
+    if quota.get("blocked"):
+        return {
+            "allowed": False,
+            "reason": "blocked",
+            "message": quota.get("block_reason") or "This device is blocked. Please contact admin.",
+            "quota": quota,
+        }
+
+    if requested_count > quota["remaining"]:
+        return {
+            "allowed": False,
+            "reason": "quota_limit",
+            "message": (
+                f"Free lifetime quota is complete. Limit: {quota['photo_limit']} photos, "
+                f"used: {quota['photos_used']} photos."
+            ),
+            "quota": quota,
+        }
+
+    return {"allowed": True, "quota": quota}
+
+
+def add_device_usage(device_limit_id: int | None, add_count: int) -> dict:
+    if not device_limit_id or add_count <= 0:
+        return get_device_quota(device_limit_id)
+
+    conn = _connect()
+    cursor = conn.cursor()
+    if IS_POSTGRES:
+        cursor.execute(
+            """
+            UPDATE device_limits
+            SET photos_used = photos_used + %s,
+                updated_at = NOW()
+            WHERE id = %s
+            RETURNING id, machine_id, ip_address, emis_code, phone_number,
+                school_name, machine_type, photo_limit, photos_used, blocked,
+                block_reason, created_at, updated_at
+            """,
+            (add_count, device_limit_id),
+        )
+        row = cursor.fetchone()
+    else:
+        cursor.execute(
+            """
+            UPDATE device_limits
+            SET photos_used = photos_used + ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (add_count, device_limit_id),
+        )
+        cursor.execute(
+            """
+            SELECT id, machine_id, ip_address, emis_code, phone_number,
+                school_name, machine_type, photo_limit, photos_used, blocked,
+                block_reason, created_at, updated_at
+            FROM device_limits
+            WHERE id = ?
+            """,
+            (device_limit_id,),
+        )
+        row = cursor.fetchone()
+
+    conn.commit()
+    device = _row_to_dict(row)
+    conn.close()
+    return _quota_payload(device)
+
+
+def create_limit_request(session: dict, requested_extra: int, message: str) -> dict:
+    conn = _connect()
+    cursor = conn.cursor()
+    requested_extra = max(1, min(int(requested_extra or 50), 1000))
+    clean_message = (message or "").strip()[:1500]
+
+    if IS_POSTGRES:
+        cursor.execute(
+            """
+            INSERT INTO limit_requests (
+                session_id, device_limit_id, machine_id, ip_address, emis_code,
+                phone_number, school_name, requested_extra, message
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, session_id, device_limit_id, machine_id, ip_address,
+                emis_code, phone_number, school_name, requested_extra, message,
+                status, created_at, resolved_at
+            """,
+            (
+                session["id"],
+                session.get("device_limit_id"),
+                session.get("machine_id") or "",
+                session.get("ip_address") or "",
+                session["emis_code"],
+                session["phone_number"],
+                session.get("school_name") or "",
+                requested_extra,
+                clean_message,
+            ),
+        )
+        row = cursor.fetchone()
+    else:
+        cursor.execute(
+            """
+            INSERT INTO limit_requests (
+                session_id, device_limit_id, machine_id, ip_address, emis_code,
+                phone_number, school_name, requested_extra, message
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                session["id"],
+                session.get("device_limit_id"),
+                session.get("machine_id") or "",
+                session.get("ip_address") or "",
+                session["emis_code"],
+                session["phone_number"],
+                session.get("school_name") or "",
+                requested_extra,
+                clean_message,
+            ),
+        )
+        request_id = cursor.lastrowid
+        cursor.execute(
+            """
+            SELECT id, session_id, device_limit_id, machine_id, ip_address,
+                emis_code, phone_number, school_name, requested_extra, message,
+                status, created_at, resolved_at
+            FROM limit_requests
+            WHERE id = ?
+            """,
+            (request_id,),
+        )
+        row = cursor.fetchone()
+
+    conn.commit()
+    request_row = _row_to_dict(row)
+    conn.close()
+    return request_row
+
+
+def update_device_limit(device_limit_id: int, photo_limit: int, request_id: int | None = None) -> dict:
+    conn = _connect()
+    cursor = conn.cursor()
+    photo_limit = max(0, min(int(photo_limit or 0), 100000))
+
+    if IS_POSTGRES:
+        cursor.execute(
+            """
+            UPDATE device_limits
+            SET photo_limit = %s,
+                blocked = FALSE,
+                block_reason = NULL,
+                updated_at = NOW()
+            WHERE id = %s
+            RETURNING id, machine_id, ip_address, emis_code, phone_number,
+                school_name, machine_type, photo_limit, photos_used, blocked,
+                block_reason, created_at, updated_at
+            """,
+            (photo_limit, device_limit_id),
+        )
+        row = cursor.fetchone()
+        if request_id:
+            cursor.execute(
+                "UPDATE limit_requests SET status = 'approved', resolved_at = NOW() WHERE id = %s",
+                (request_id,),
+            )
+    else:
+        cursor.execute(
+            """
+            UPDATE device_limits
+            SET photo_limit = ?,
+                blocked = 0,
+                block_reason = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (photo_limit, device_limit_id),
+        )
+        cursor.execute(
+            """
+            SELECT id, machine_id, ip_address, emis_code, phone_number,
+                school_name, machine_type, photo_limit, photos_used, blocked,
+                block_reason, created_at, updated_at
+            FROM device_limits
+            WHERE id = ?
+            """,
+            (device_limit_id,),
+        )
+        row = cursor.fetchone()
+        if request_id:
+            cursor.execute(
+                "UPDATE limit_requests SET status = 'approved', resolved_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (request_id,),
+            )
+
+    conn.commit()
+    device = _row_to_dict(row)
+    conn.close()
+    return device
 
 
 def record_feedback(session: dict, rating: int, category: str, message: str) -> dict:
@@ -543,6 +1151,9 @@ def get_admin_records(limit: int = 500) -> dict:
     cursor.execute("SELECT COUNT(*) AS total_feedback FROM feedback_entries")
     total_feedback = _row_to_dict(cursor.fetchone())["total_feedback"]
 
+    cursor.execute("SELECT COUNT(*) AS total_limit_requests FROM limit_requests WHERE status = 'pending'")
+    total_limit_requests = _row_to_dict(cursor.fetchone())["total_limit_requests"]
+
     cursor.execute(
         f"""
         WITH school_rollup AS (
@@ -628,6 +1239,35 @@ def get_admin_records(limit: int = 500) -> dict:
     )
     feedback = [_row_to_dict(row) for row in cursor.fetchall()]
 
+    cursor.execute(
+        f"""
+        SELECT id, machine_id, ip_address, emis_code, phone_number, school_name,
+            machine_type, photo_limit, photos_used, blocked, block_reason,
+            created_at, updated_at
+        FROM device_limits
+        ORDER BY updated_at DESC, id DESC
+        LIMIT {limit_placeholder}
+        """,
+        (limit,),
+    )
+    device_limits = [_row_to_dict(row) for row in cursor.fetchall()]
+
+    cursor.execute(
+        f"""
+        SELECT id, session_id, device_limit_id, machine_id, ip_address,
+            emis_code, phone_number, school_name, requested_extra, message,
+            status, created_at, resolved_at
+        FROM limit_requests
+        ORDER BY
+            CASE WHEN status = 'pending' THEN 0 ELSE 1 END,
+            created_at DESC,
+            id DESC
+        LIMIT {limit_placeholder}
+        """,
+        (min(limit, 100),),
+    )
+    limit_requests = [_row_to_dict(row) for row in cursor.fetchall()]
+
     conn.close()
     return {
         "total_sessions": int(total_sessions or 0),
@@ -635,7 +1275,10 @@ def get_admin_records(limit: int = 500) -> dict:
         "total_images": int(total_images or 0),
         "total_machines": int(total_machines or 0),
         "total_feedback": int(total_feedback or 0),
+        "total_limit_requests": int(total_limit_requests or 0),
         "schools": schools,
         "sessions": schools,
         "feedback": feedback,
+        "device_limits": device_limits,
+        "limit_requests": limit_requests,
     }
