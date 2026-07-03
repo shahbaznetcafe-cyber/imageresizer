@@ -350,27 +350,39 @@ def _bootstrap_device_limits(cursor) -> None:
     if IS_POSTGRES:
         cursor.execute(
             """
+            WITH latest_machine AS (
+                SELECT DISTINCT ON (machine_id)
+                    machine_id,
+                    NULLIF(ip_address, '') AS ip_address,
+                    emis_code,
+                    phone_number,
+                    NULLIF(school_name, '') AS school_name,
+                    NULLIF(machine_type, '') AS machine_type
+                FROM school_sessions
+                WHERE COALESCE(machine_id, '') <> ''
+                ORDER BY machine_id, created_at DESC, id DESC
+            )
             INSERT INTO device_limits (
                 machine_id, ip_address, emis_code, phone_number, school_name,
                 machine_type, photo_limit, photos_used
             )
             SELECT
-                s.machine_id,
-                MAX(NULLIF(s.ip_address, '')) AS ip_address,
-                (ARRAY_AGG(s.emis_code ORDER BY s.created_at DESC, s.id DESC))[1] AS emis_code,
-                (ARRAY_AGG(s.phone_number ORDER BY s.created_at DESC, s.id DESC))[1] AS phone_number,
-                (ARRAY_AGG(NULLIF(s.school_name, '') ORDER BY s.created_at DESC, s.id DESC))[1] AS school_name,
-                (ARRAY_AGG(NULLIF(s.machine_type, '') ORDER BY s.created_at DESC, s.id DESC))[1] AS machine_type,
+                latest_machine.machine_id,
+                latest_machine.ip_address,
+                latest_machine.emis_code,
+                latest_machine.phone_number,
+                latest_machine.school_name,
+                latest_machine.machine_type,
                 %s AS photo_limit,
-                COUNT(DISTINCT p.id) AS photos_used
-            FROM school_sessions s
-            LEFT JOIN processed_images p
-                ON p.machine_id = s.machine_id
-            WHERE COALESCE(s.machine_id, '') <> ''
-              AND NOT EXISTS (
-                SELECT 1 FROM device_limits d WHERE d.machine_id = s.machine_id
+                COALESCE((
+                    SELECT COUNT(*)
+                    FROM processed_images pi
+                    WHERE pi.emis_code = latest_machine.emis_code
+                ), 0) AS photos_used
+            FROM latest_machine
+            WHERE NOT EXISTS (
+                SELECT 1 FROM device_limits d WHERE d.machine_id = latest_machine.machine_id
               )
-            GROUP BY s.machine_id
             """,
             (DEFAULT_PHOTO_LIMIT,),
         )
@@ -378,19 +390,35 @@ def _bootstrap_device_limits(cursor) -> None:
 
     cursor.execute(
         """
+        WITH ranked AS (
+            SELECT
+                machine_id,
+                NULLIF(ip_address, '') AS ip_address,
+                emis_code,
+                phone_number,
+                NULLIF(school_name, '') AS school_name,
+                NULLIF(machine_type, '') AS machine_type,
+                ROW_NUMBER() OVER (
+                    PARTITION BY machine_id
+                    ORDER BY created_at DESC, id DESC
+                ) AS row_number
+            FROM school_sessions
+            WHERE COALESCE(machine_id, '') <> ''
+        )
         SELECT
-            s.machine_id,
-            MAX(NULLIF(s.ip_address, '')) AS ip_address,
-            MAX(s.emis_code) AS emis_code,
-            MAX(s.phone_number) AS phone_number,
-            MAX(NULLIF(s.school_name, '')) AS school_name,
-            MAX(NULLIF(s.machine_type, '')) AS machine_type,
-            COUNT(DISTINCT p.id) AS photos_used
-        FROM school_sessions s
-        LEFT JOIN processed_images p
-            ON p.machine_id = s.machine_id
-        WHERE COALESCE(s.machine_id, '') <> ''
-        GROUP BY s.machine_id
+            ranked.machine_id,
+            ranked.ip_address,
+            ranked.emis_code,
+            ranked.phone_number,
+            ranked.school_name,
+            ranked.machine_type,
+            (
+                SELECT COUNT(*)
+                FROM processed_images pi
+                WHERE pi.emis_code = ranked.emis_code
+            ) AS photos_used
+        FROM ranked
+        WHERE ranked.row_number = 1
         """
     )
     for row in cursor.fetchall():
@@ -442,6 +470,63 @@ def _quota_payload(device: dict | None) -> dict:
         "blocked": bool(device.get("blocked")),
         "block_reason": device.get("block_reason") or "",
     }
+
+
+def _sync_device_usage_from_history(cursor, device_id: int, emis_code: str) -> dict | None:
+    """Keeps quota usage aligned with old rows that did not have machine IDs."""
+    if not device_id or not emis_code:
+        return None
+
+    if IS_POSTGRES:
+        cursor.execute(
+            """
+            UPDATE device_limits
+            SET photos_used = GREATEST(
+                    photos_used,
+                    (
+                        SELECT COUNT(*)
+                        FROM processed_images
+                        WHERE emis_code = %s
+                    )
+                ),
+                updated_at = NOW()
+            WHERE id = %s
+            RETURNING id, machine_id, ip_address, emis_code, phone_number,
+                school_name, machine_type, photo_limit, photos_used, blocked,
+                block_reason, created_at, updated_at
+            """,
+            (emis_code, device_id),
+        )
+    else:
+        cursor.execute(
+            "SELECT COUNT(*) AS image_count FROM processed_images WHERE emis_code = ?",
+            (emis_code,),
+        )
+        image_count = int(_row_to_dict(cursor.fetchone())["image_count"] or 0)
+        cursor.execute(
+            """
+            UPDATE device_limits
+            SET photos_used = CASE
+                    WHEN photos_used < ? THEN ?
+                    ELSE photos_used
+                END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (image_count, image_count, device_id),
+        )
+        cursor.execute(
+            """
+            SELECT id, machine_id, ip_address, emis_code, phone_number,
+                school_name, machine_type, photo_limit, photos_used, blocked,
+                block_reason, created_at, updated_at
+            FROM device_limits
+            WHERE id = ?
+            """,
+            (device_id,),
+        )
+
+    return _row_to_dict(cursor.fetchone())
 
 
 def _fetch_device_limits(cursor, machine_id: str = "", ip_address: str = "") -> list[dict]:
@@ -549,6 +634,8 @@ def get_or_create_device_limit(
 
         conn.commit()
         device = _row_to_dict(row)
+        device = _sync_device_usage_from_history(cursor, device["id"], emis_code) or device
+        conn.commit()
         conn.close()
         return {"allowed": True, "device": device, "quota": _quota_payload(device)}
 
@@ -593,6 +680,8 @@ def get_or_create_device_limit(
 
     conn.commit()
     device = _row_to_dict(row)
+    device = _sync_device_usage_from_history(cursor, device["id"], emis_code) or device
+    conn.commit()
     conn.close()
     return {"allowed": True, "device": device, "quota": _quota_payload(device)}
 

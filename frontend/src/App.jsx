@@ -13,7 +13,7 @@ import LimitRequestForm from './components/LimitRequestForm';
 import { getApiErrorMessage, getNetworkErrorMessage } from './utils/apiErrors';
 import { getApiUrl } from './utils/api';
 
-const SESSION_CACHE_KEY = 'pectaa-session-cache';
+const SESSION_CACHE_KEY = 'pectaa-session-cache-v2';
 const SESSION_CACHE_MS = 2 * 60 * 60 * 1000;
 
 function loadCachedSession() {
@@ -277,7 +277,11 @@ export default function App() {
             <div className="flex items-center gap-4 bg-slate-50 border border-slate-200/50 rounded-xl p-2 pl-3 pr-2.5 shadow-sm text-xs transition-all duration-300">
               <div className="text-right">
                 <p className="font-semibold text-slate-700 font-mono">EMIS: {session.emis_code}</p>
-                <p className="text-[10px] text-slate-400">Processed: {session.processed_count} photos</p>
+                <p className="text-[10px] text-slate-400">
+                  {session.quota
+                    ? `Quota used: ${session.quota.photos_used || 0}/${session.quota.photo_limit || 50} photos`
+                    : `Processed: ${session.processed_count} photos`}
+                </p>
               </div>
               <button
                 onClick={handleLogout}
