@@ -291,6 +291,13 @@ def api_limit_request(
     if not session or is_session_expired(session):
         raise HTTPException(status_code=404, detail="Session expired. Please log in again.")
 
+    quota_check = check_device_quota(session, 1)
+    if quota_check["allowed"]:
+        raise HTTPException(
+            status_code=400,
+            detail="This device still has free photo quota available.",
+        )
+
     limit_request = create_limit_request(session, requested_extra, message)
     return {"success": True, "request": limit_request}
 
