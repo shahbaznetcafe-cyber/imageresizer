@@ -15,6 +15,10 @@ import { getApiUrl } from './utils/api';
 
 const SESSION_CACHE_KEY = 'pectaa-session-cache-v2';
 const SESSION_CACHE_MS = 2 * 60 * 60 * 1000;
+const LOCAL_PERSONAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
+const PERSONAL_MODE = import.meta.env.VITE_PERSONAL_MODE === 'true'
+  || LOCAL_PERSONAL_HOSTS.has(window.location.hostname);
+const PERSONAL_MACHINE_ID_KEY = 'pectaa-personal-machine-id';
 
 function loadCachedSession() {
   try {
@@ -42,6 +46,16 @@ function storeCachedSession(sessionData) {
 
 function clearCachedSession() {
   window.localStorage.removeItem(SESSION_CACHE_KEY);
+}
+
+function getPersonalMachineId() {
+  const existing = window.localStorage.getItem(PERSONAL_MACHINE_ID_KEY);
+  if (existing) return existing;
+
+  const id = window.crypto?.randomUUID?.()
+    || `personal-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  window.localStorage.setItem(PERSONAL_MACHINE_ID_KEY, id);
+  return id;
 }
 
 function wait(ms) {
@@ -111,12 +125,65 @@ export default function App() {
   const [quotaRestriction, setQuotaRestriction] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     const cachedSession = loadCachedSession();
     if (cachedSession) {
       setSession(cachedSession);
       setStep('upload');
       warmBackendProcessor();
+      return () => {
+        isMounted = false;
+      };
     }
+
+    if (!PERSONAL_MODE) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const createPersonalSession = async () => {
+      setStep('login');
+      setError(null);
+
+      try {
+        const formData = new FormData();
+        formData.append('emis_code', '00000000');
+        formData.append('school_name', 'Personal Use');
+        formData.append('phone_number', '0000000000');
+        formData.append('machine_id', getPersonalMachineId());
+        formData.append('machine_type', 'Personal Local Unlimited');
+
+        const response = await fetch(getApiUrl('/api/session'), {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(await getApiErrorMessage(response, 'Personal session could not start.'));
+        }
+
+        const sessionData = await response.json();
+        if (!isMounted) return;
+        setSession(sessionData);
+        setQuotaRestriction(null);
+        storeCachedSession(sessionData);
+        warmBackendProcessor();
+        setStep('upload');
+      } catch (err) {
+        if (!isMounted) return;
+        const message = getNetworkErrorMessage(err, 'Personal mode backend is not ready. Please refresh in a few seconds.');
+        setError({ en: message, ur: message });
+        setStep('login');
+      }
+    };
+
+    createPersonalSession();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleLoginSuccess = (sessionData) => {
@@ -278,7 +345,9 @@ export default function App() {
               <div className="text-right">
                 <p className="font-semibold text-slate-700 font-mono">EMIS: {session.emis_code}</p>
                 <p className="text-[10px] text-slate-400">
-                  {session.quota
+                  {PERSONAL_MODE || session.quota?.unlimited
+                    ? 'Personal unlimited mode'
+                    : session.quota
                     ? `Quota used: ${session.quota.photos_used || 0}/${session.quota.photo_limit || 50} photos`
                     : `Processed: ${session.processed_count} photos`}
                 </p>
@@ -352,10 +421,18 @@ export default function App() {
           ) : (
             <>
               {step === 'login' && (
-                <LoginRecordForm
-                  onLoginSuccess={handleLoginSuccess}
-                  onAdminOpen={() => setShowAdmin(true)}
-                />
+                PERSONAL_MODE ? (
+                  <div className="w-full max-w-md rounded-2xl border border-slate-100 bg-white p-8 text-center shadow-xl">
+                    <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-slate-100 border-t-punjab-blue" />
+                    <p className="text-sm font-bold text-slate-700">Starting personal unlimited mode...</p>
+                    <p className="mt-1 text-xs text-slate-400">Backend ready hotay hi upload screen open ho jayegi.</p>
+                  </div>
+                ) : (
+                  <LoginRecordForm
+                    onLoginSuccess={handleLoginSuccess}
+                    onAdminOpen={() => setShowAdmin(true)}
+                  />
+                )
               )}
               {step === 'upload' && (
                 quotaReached ? (

@@ -5,6 +5,13 @@ from datetime import date, datetime
 from decimal import Decimal
 
 DEFAULT_PHOTO_LIMIT = int(os.getenv("DEFAULT_PHOTO_LIMIT", "50"))
+DISABLE_USAGE_LIMITS = os.getenv("DISABLE_USAGE_LIMITS", "").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+UNLIMITED_PHOTO_LIMIT = 999999999
 
 DEFAULT_DATABASE_FILE = (
     os.path.join(tempfile.gettempdir(), "school_sessions.db")
@@ -19,6 +26,15 @@ DATABASE_URL = (
 )
 IS_POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
 DATABASE_BACKEND = "supabase_postgres" if IS_POSTGRES else "sqlite"
+
+VALID_SCHOOL_IDENTITY_WHERE = """
+COALESCE(NULLIF(TRIM(emis_code), ''), '') <> ''
+AND REPLACE(TRIM(emis_code), '0', '') <> ''
+AND COALESCE(NULLIF(TRIM(phone_number), ''), '') <> ''
+AND REPLACE(TRIM(phone_number), '0', '') <> ''
+AND COALESCE(NULLIF(TRIM(school_name), ''), '') <> ''
+AND REPLACE(TRIM(school_name), '0', '') <> ''
+"""
 
 
 def _json_safe(value):
@@ -176,6 +192,26 @@ def init_db():
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS school_error_events (
+                id BIGSERIAL PRIMARY KEY,
+                session_id BIGINT REFERENCES school_sessions(id) ON DELETE SET NULL,
+                device_limit_id BIGINT REFERENCES device_limits(id) ON DELETE SET NULL,
+                emis_code TEXT,
+                phone_number TEXT,
+                school_name TEXT,
+                machine_id TEXT,
+                machine_type TEXT,
+                ip_address TEXT,
+                event_type TEXT NOT NULL,
+                severity TEXT NOT NULL DEFAULT 'warning',
+                message TEXT NOT NULL,
+                context TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
     else:
         cursor.execute(
             """
@@ -272,6 +308,28 @@ def init_db():
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS school_error_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER,
+                device_limit_id INTEGER,
+                emis_code TEXT,
+                phone_number TEXT,
+                school_name TEXT,
+                machine_id TEXT,
+                machine_type TEXT,
+                ip_address TEXT,
+                event_type TEXT NOT NULL,
+                severity TEXT DEFAULT 'warning',
+                message TEXT NOT NULL,
+                context TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES school_sessions(id) ON DELETE SET NULL,
+                FOREIGN KEY (device_limit_id) REFERENCES device_limits(id) ON DELETE SET NULL
+            )
+            """
+        )
 
     for table_name in ("school_sessions", "processed_images"):
         _ensure_column(cursor, table_name, "school_name", "TEXT")
@@ -340,7 +398,26 @@ def init_db():
         ON limit_requests(status)
         """
     )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_school_error_events_created_at
+        ON school_error_events(created_at)
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_school_error_events_emis_code
+        ON school_error_events(emis_code)
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_school_error_events_event_type
+        ON school_error_events(event_type)
+        """
+    )
     _bootstrap_device_limits(cursor)
+    _reject_placeholder_limit_requests(cursor)
     conn.commit()
     conn.close()
 
@@ -450,7 +527,37 @@ def _bootstrap_device_limits(cursor) -> None:
         )
 
 
+def _reject_placeholder_limit_requests(cursor) -> None:
+    """Keeps invalid placeholder requests out of the pending admin queue."""
+    timestamp_sql = "NOW()" if IS_POSTGRES else "CURRENT_TIMESTAMP"
+    cursor.execute(
+        f"""
+        UPDATE limit_requests
+        SET status = 'rejected',
+            resolved_at = {timestamp_sql},
+            message = CASE
+                WHEN COALESCE(message, '') = '' THEN 'Auto rejected: missing real EMIS, phone, or school name.'
+                ELSE message || ' | Auto rejected: missing real EMIS, phone, or school name.'
+            END
+        WHERE status = 'pending'
+          AND NOT ({VALID_SCHOOL_IDENTITY_WHERE})
+        """
+    )
+
+
 def _quota_payload(device: dict | None) -> dict:
+    if DISABLE_USAGE_LIMITS:
+        photos_used = int(device.get("photos_used") or 0) if device else 0
+        return {
+            "device_limit_id": device.get("id") if device else None,
+            "photo_limit": UNLIMITED_PHOTO_LIMIT,
+            "photos_used": photos_used,
+            "remaining": UNLIMITED_PHOTO_LIMIT,
+            "blocked": False,
+            "block_reason": "",
+            "unlimited": True,
+        }
+
     if not device:
         return {
             "device_limit_id": None,
@@ -574,12 +681,22 @@ def get_or_create_device_limit(
     phone_number = (phone_number or "").strip()
 
     matches = _fetch_device_limits(cursor, machine_id, ip_address)
-    chosen = next((item for item in matches if item.get("machine_id") == machine_id and machine_id), None)
-    chosen = chosen or (matches[0] if matches else None)
+    if DISABLE_USAGE_LIMITS:
+        chosen = next(
+            (
+                item
+                for item in matches
+                if item.get("emis_code") == emis_code and item.get("phone_number") == phone_number
+            ),
+            None,
+        )
+    else:
+        chosen = next((item for item in matches if item.get("machine_id") == machine_id and machine_id), None)
+        chosen = chosen or (matches[0] if matches else None)
 
     if chosen:
         same_school = chosen.get("emis_code") == emis_code and chosen.get("phone_number") == phone_number
-        if not same_school:
+        if not DISABLE_USAGE_LIMITS and not same_school:
             conn.close()
             return {
                 "allowed": False,
@@ -889,6 +1006,9 @@ def check_device_quota(session: dict, requested_count: int) -> dict:
     quota = get_device_quota(session.get("device_limit_id"))
     requested_count = int(requested_count or 0)
 
+    if DISABLE_USAGE_LIMITS:
+        return {"allowed": True, "quota": quota}
+
     if quota.get("blocked"):
         return {
             "allowed": False,
@@ -1091,6 +1211,91 @@ def update_device_limit(device_limit_id: int, photo_limit: int, request_id: int 
     return device
 
 
+def record_school_error(
+    event_type: str,
+    message: str,
+    session: dict | None = None,
+    emis_code: str = "",
+    phone_number: str = "",
+    school_name: str = "",
+    machine_id: str = "",
+    machine_type: str = "",
+    ip_address: str = "",
+    device_limit_id: int | None = None,
+    severity: str = "warning",
+    context: str = "",
+) -> dict:
+    """Stores refused/error events separately for admin monitoring."""
+    session = session or {}
+    event_type_value = (event_type or "unknown_error").strip()[:80]
+    severity_value = (severity or "warning").strip()[:20]
+    message_value = (message or "Unknown error").strip()[:2000]
+    context_value = (context or "").strip()[:2000]
+
+    conn = _connect()
+    cursor = conn.cursor()
+    values = (
+        session.get("id"),
+        device_limit_id or session.get("device_limit_id"),
+        (emis_code or session.get("emis_code") or "").strip()[:20],
+        (phone_number or session.get("phone_number") or "").strip()[:30],
+        (school_name or session.get("school_name") or "").strip()[:120],
+        (machine_id or session.get("machine_id") or "").strip()[:120],
+        (machine_type or session.get("machine_type") or "").strip()[:120],
+        (ip_address or session.get("ip_address") or "").strip()[:80],
+        event_type_value,
+        severity_value,
+        message_value,
+        context_value,
+    )
+
+    if IS_POSTGRES:
+        cursor.execute(
+            """
+            INSERT INTO school_error_events (
+                session_id, device_limit_id, emis_code, phone_number, school_name,
+                machine_id, machine_type, ip_address, event_type, severity,
+                message, context
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, session_id, device_limit_id, emis_code, phone_number,
+                school_name, machine_id, machine_type, ip_address, event_type,
+                severity, message, context, created_at
+            """,
+            values,
+        )
+        row = cursor.fetchone()
+    else:
+        cursor.execute(
+            """
+            INSERT INTO school_error_events (
+                session_id, device_limit_id, emis_code, phone_number, school_name,
+                machine_id, machine_type, ip_address, event_type, severity,
+                message, context
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            values,
+        )
+        event_id = cursor.lastrowid
+        cursor.execute(
+            """
+            SELECT id, session_id, device_limit_id, emis_code, phone_number,
+                school_name, machine_id, machine_type, ip_address, event_type,
+                severity, message, context, created_at
+            FROM school_error_events
+            WHERE id = ?
+            """,
+            (event_id,),
+        )
+        row = cursor.fetchone()
+
+    conn.commit()
+    event = _row_to_dict(row)
+    conn.close()
+    return event
+
+
 def record_feedback(session: dict, rating: int, category: str, message: str) -> dict:
     """Stores feedback with the current school's private session details."""
     conn = _connect()
@@ -1168,16 +1373,27 @@ def get_activity_summary(limit: int = 8) -> dict:
     cursor = conn.cursor()
     limit_placeholder = "%s" if IS_POSTGRES else "?"
 
-    cursor.execute("SELECT COUNT(*) AS total_sessions FROM school_sessions")
+    cursor.execute(
+        f"SELECT COUNT(*) AS total_sessions FROM school_sessions WHERE {VALID_SCHOOL_IDENTITY_WHERE}"
+    )
     total_sessions = _row_to_dict(cursor.fetchone())["total_sessions"]
 
-    cursor.execute("SELECT COUNT(DISTINCT emis_code) AS total_schools FROM school_sessions")
+    cursor.execute(
+        f"SELECT COUNT(DISTINCT emis_code) AS total_schools FROM school_sessions WHERE {VALID_SCHOOL_IDENTITY_WHERE}"
+    )
     total_schools = _row_to_dict(cursor.fetchone())["total_schools"]
 
     cursor.execute("SELECT COUNT(*) AS total_images FROM processed_images")
     total_images = _row_to_dict(cursor.fetchone())["total_images"]
 
-    cursor.execute("SELECT COUNT(DISTINCT machine_id) AS total_machines FROM school_sessions WHERE COALESCE(machine_id, '') <> ''")
+    cursor.execute(
+        f"""
+        SELECT COUNT(DISTINCT machine_id) AS total_machines
+        FROM school_sessions
+        WHERE COALESCE(machine_id, '') <> ''
+          AND {VALID_SCHOOL_IDENTITY_WHERE}
+        """
+    )
     total_machines = _row_to_dict(cursor.fetchone())["total_machines"]
 
     cursor.execute(
@@ -1225,23 +1441,44 @@ def get_admin_records(limit: int = 500) -> dict:
     cursor = conn.cursor()
     limit_placeholder = "%s" if IS_POSTGRES else "?"
 
-    cursor.execute("SELECT COUNT(*) AS total_sessions FROM school_sessions")
+    cursor.execute(
+        f"SELECT COUNT(*) AS total_sessions FROM school_sessions WHERE {VALID_SCHOOL_IDENTITY_WHERE}"
+    )
     total_sessions = _row_to_dict(cursor.fetchone())["total_sessions"]
 
-    cursor.execute("SELECT COUNT(DISTINCT emis_code) AS total_schools FROM school_sessions")
+    cursor.execute(
+        f"SELECT COUNT(DISTINCT emis_code) AS total_schools FROM school_sessions WHERE {VALID_SCHOOL_IDENTITY_WHERE}"
+    )
     total_schools = _row_to_dict(cursor.fetchone())["total_schools"]
 
     cursor.execute("SELECT COUNT(*) AS total_images FROM processed_images")
     total_images = _row_to_dict(cursor.fetchone())["total_images"]
 
-    cursor.execute("SELECT COUNT(DISTINCT machine_id) AS total_machines FROM school_sessions WHERE COALESCE(machine_id, '') <> ''")
+    cursor.execute(
+        f"""
+        SELECT COUNT(DISTINCT machine_id) AS total_machines
+        FROM school_sessions
+        WHERE COALESCE(machine_id, '') <> ''
+          AND {VALID_SCHOOL_IDENTITY_WHERE}
+        """
+    )
     total_machines = _row_to_dict(cursor.fetchone())["total_machines"]
 
     cursor.execute("SELECT COUNT(*) AS total_feedback FROM feedback_entries")
     total_feedback = _row_to_dict(cursor.fetchone())["total_feedback"]
 
-    cursor.execute("SELECT COUNT(*) AS total_limit_requests FROM limit_requests WHERE status = 'pending'")
+    cursor.execute(
+        f"""
+        SELECT COUNT(*) AS total_limit_requests
+        FROM limit_requests
+        WHERE status = 'pending'
+          AND {VALID_SCHOOL_IDENTITY_WHERE}
+        """
+    )
     total_limit_requests = _row_to_dict(cursor.fetchone())["total_limit_requests"]
+
+    cursor.execute("SELECT COUNT(*) AS total_error_events FROM school_error_events")
+    total_error_events = _row_to_dict(cursor.fetchone())["total_error_events"]
 
     cursor.execute(
         f"""
@@ -1254,6 +1491,7 @@ def get_admin_records(limit: int = 500) -> dict:
                 MIN(created_at) AS first_session_at,
                 MAX(created_at) AS last_session_at
             FROM school_sessions
+            WHERE {VALID_SCHOOL_IDENTITY_WHERE}
             GROUP BY emis_code
         ),
         image_rollup AS (
@@ -1347,6 +1585,7 @@ def get_admin_records(limit: int = 500) -> dict:
             emis_code, phone_number, school_name, requested_extra, message,
             status, created_at, resolved_at
         FROM limit_requests
+        WHERE {VALID_SCHOOL_IDENTITY_WHERE}
         ORDER BY
             CASE WHEN status = 'pending' THEN 0 ELSE 1 END,
             created_at DESC,
@@ -1357,6 +1596,19 @@ def get_admin_records(limit: int = 500) -> dict:
     )
     limit_requests = [_row_to_dict(row) for row in cursor.fetchall()]
 
+    cursor.execute(
+        f"""
+        SELECT id, session_id, device_limit_id, emis_code, phone_number,
+            school_name, machine_id, machine_type, ip_address, event_type,
+            severity, message, context, created_at
+        FROM school_error_events
+        ORDER BY created_at DESC, id DESC
+        LIMIT {limit_placeholder}
+        """,
+        (min(limit, 150),),
+    )
+    error_events = [_row_to_dict(row) for row in cursor.fetchall()]
+
     conn.close()
     return {
         "total_sessions": int(total_sessions or 0),
@@ -1365,9 +1617,11 @@ def get_admin_records(limit: int = 500) -> dict:
         "total_machines": int(total_machines or 0),
         "total_feedback": int(total_feedback or 0),
         "total_limit_requests": int(total_limit_requests or 0),
+        "total_error_events": int(total_error_events or 0),
         "schools": schools,
         "sessions": schools,
         "feedback": feedback,
         "device_limits": device_limits,
         "limit_requests": limit_requests,
+        "error_events": error_events,
     }

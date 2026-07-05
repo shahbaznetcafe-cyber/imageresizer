@@ -24,10 +24,12 @@ try:
         create_limit_request,
         get_or_create_device_limit,
         record_feedback,
+        record_school_error,
         record_processed_images,
         update_device_limit,
         update_processed_count,
         DATABASE_BACKEND,
+        DISABLE_USAGE_LIMITS,
     )
     from .image_processor import process_single_image, warm_image_processor
 except ImportError:
@@ -42,10 +44,12 @@ except ImportError:
         create_limit_request,
         get_or_create_device_limit,
         record_feedback,
+        record_school_error,
         record_processed_images,
         update_device_limit,
         update_processed_count,
         DATABASE_BACKEND,
+        DISABLE_USAGE_LIMITS,
     )
     from image_processor import process_single_image, warm_image_processor
 
@@ -156,6 +160,16 @@ def get_client_ip(request: Request) -> str:
     )[:80]
 
 
+def is_all_zero_digits(value: str) -> bool:
+    digits = "".join(filter(str.isdigit, value or ""))
+    return bool(digits) and set(digits) == {"0"}
+
+
+def is_blank_or_placeholder_text(value: str) -> bool:
+    text = " ".join((value or "").strip().split())
+    return not text or set(text) <= {"0"}
+
+
 @app.post("/api/session")
 def api_create_session(
     request: Request,
@@ -170,9 +184,24 @@ def api_create_session(
     Validates EMIS code (8 digits) and Phone Number.
     No password required.
     """
+    request_ip = get_client_ip(request)
+    raw_machine_id = (machine_id or "").strip()[:80]
+    raw_machine_type = " ".join((machine_type or "").strip().split())[:120]
+
     # Validate EMIS code (should be numeric and exactly 8 digits)
     emis_cleaned = "".join(filter(str.isdigit, emis_code))
     if len(emis_cleaned) != 8:
+        record_school_error(
+            "invalid_emis",
+            "Invalid EMIS code during login. EMIS must be exactly 8 digits.",
+            emis_code=emis_cleaned or (emis_code or "")[:20],
+            phone_number="".join(filter(str.isdigit, phone_number))[:30],
+            school_name=school_name,
+            machine_id=raw_machine_id,
+            machine_type=raw_machine_type,
+            ip_address=request_ip,
+            severity="warning",
+        )
         raise HTTPException(
             status_code=400,
             detail={
@@ -180,10 +209,41 @@ def api_create_session(
                 "ur": "غلط ایمس کوڈ۔ یہ صرف 8 ہندسوں پر مشتمل ہونا چاہئے۔"
             }
         )
+
+    if not DISABLE_USAGE_LIMITS and is_all_zero_digits(emis_cleaned):
+        record_school_error(
+            "placeholder_emis",
+            "Placeholder EMIS code was refused during login.",
+            emis_code=emis_cleaned,
+            phone_number="".join(filter(str.isdigit, phone_number))[:30],
+            school_name=school_name,
+            machine_id=raw_machine_id,
+            machine_type=raw_machine_type,
+            ip_address=request_ip,
+            severity="warning",
+        )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "en": "Please enter the real School EMIS Code. Zero values are not allowed.",
+                "ur": "Please enter the real School EMIS Code. Zero values are not allowed."
+            }
+        )
         
     # Validate Phone Number (basic length check, should have at least 10 digits)
     phone_cleaned = "".join(filter(str.isdigit, phone_number))
     if len(phone_cleaned) < 10 or len(phone_cleaned) > 15:
+        record_school_error(
+            "invalid_phone",
+            "Invalid phone number during login. Phone must be 10-15 digits.",
+            emis_code=emis_cleaned,
+            phone_number=phone_cleaned,
+            school_name=school_name,
+            machine_id=raw_machine_id,
+            machine_type=raw_machine_type,
+            ip_address=request_ip,
+            severity="warning",
+        )
         raise HTTPException(
             status_code=400,
             detail={
@@ -192,17 +252,51 @@ def api_create_session(
             }
         )
 
-    school_name_cleaned = " ".join((school_name or "").strip().split())[:120]
-    machine_id_cleaned = (machine_id or "").strip()[:80]
-    machine_type_cleaned = " ".join((machine_type or "").strip().split())[:120]
-    ip_address = get_client_ip(request)
-
-    if school_name and len(school_name_cleaned) < 2:
+    if not DISABLE_USAGE_LIMITS and is_all_zero_digits(phone_cleaned):
+        record_school_error(
+            "placeholder_phone",
+            "Placeholder phone number was refused during login.",
+            emis_code=emis_cleaned,
+            phone_number=phone_cleaned,
+            school_name=school_name,
+            machine_id=raw_machine_id,
+            machine_type=raw_machine_type,
+            ip_address=request_ip,
+            severity="warning",
+        )
         raise HTTPException(
             status_code=400,
             detail={
-                "en": "School Name must be at least 2 characters.",
-                "ur": "School Name must be at least 2 characters."
+                "en": "Please enter the real operator phone number. Zero values are not allowed.",
+                "ur": "Please enter the real operator phone number. Zero values are not allowed."
+            }
+        )
+
+    school_name_cleaned = " ".join((school_name or "").strip().split())[:120]
+    machine_id_cleaned = raw_machine_id
+    machine_type_cleaned = raw_machine_type
+    ip_address = request_ip
+
+    if (
+        (not DISABLE_USAGE_LIMITS and is_blank_or_placeholder_text(school_name_cleaned))
+        or (school_name and len(school_name_cleaned) < 2)
+    ):
+        record_school_error(
+            "invalid_school_name",
+            "Invalid or placeholder school name was refused during login.",
+            emis_code=emis_cleaned,
+            phone_number=phone_cleaned,
+            school_name=school_name_cleaned,
+            machine_id=machine_id_cleaned,
+            machine_type=machine_type_cleaned,
+            ip_address=ip_address,
+            severity="warning",
+        )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "en": "Please enter the real School Name.",
+                "ur": "Please enter the real School Name."
             }
         )
 
@@ -215,6 +309,23 @@ def api_create_session(
         ip_address,
     )
     if not device_result["allowed"]:
+        locked_device = device_result.get("device") or {}
+        record_school_error(
+            device_result.get("reason") or "device_locked",
+            device_result["message"],
+            emis_code=emis_cleaned,
+            phone_number=phone_cleaned,
+            school_name=school_name_cleaned,
+            machine_id=machine_id_cleaned,
+            machine_type=machine_type_cleaned,
+            ip_address=ip_address,
+            device_limit_id=locked_device.get("id"),
+            severity="block",
+            context=(
+                f"Registered EMIS: {locked_device.get('emis_code') or 'N/A'}; "
+                f"registered phone: {locked_device.get('phone_number') or 'N/A'}"
+            ),
+        )
         raise HTTPException(
             status_code=403,
             detail={
@@ -291,8 +402,36 @@ def api_limit_request(
     if not session or is_session_expired(session):
         raise HTTPException(status_code=404, detail="Session expired. Please log in again.")
 
+    if not DISABLE_USAGE_LIMITS and (
+        is_all_zero_digits(session.get("emis_code", ""))
+        or is_all_zero_digits(session.get("phone_number", ""))
+        or is_blank_or_placeholder_text(session.get("school_name", ""))
+    ):
+        record_school_error(
+            "placeholder_limit_request",
+            "Limit request refused because the session had placeholder school identity values.",
+            session=session,
+            severity="block",
+            context="User must log in again with real EMIS, school name, and phone number.",
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="Please log in again with real EMIS, school name, and phone number before sending a limit request.",
+        )
+
     quota_check = check_device_quota(session, 1)
     if quota_check["allowed"]:
+        quota = quota_check.get("quota") or {}
+        record_school_error(
+            "limit_request_before_quota",
+            "Limit request submitted while this device still had free quota available.",
+            session=session,
+            severity="warning",
+            context=(
+                f"Requested extra: {requested_extra}; limit: {quota.get('photo_limit')}; "
+                f"used: {quota.get('photos_used')}; remaining: {quota.get('remaining')}"
+            ),
+        )
         raise HTTPException(
             status_code=400,
             detail="This device still has free photo quota available.",
@@ -332,6 +471,13 @@ async def api_process_images(
     # 1. Validate Session ID
     session = get_session(session_id)
     if not session or is_session_expired(session):
+        if session:
+            record_school_error(
+                "session_expired",
+                "Session expired while user tried to process images.",
+                session=session,
+                severity="warning",
+            )
         raise HTTPException(
             status_code=404,
             detail={
@@ -342,6 +488,13 @@ async def api_process_images(
         
     # 2. Validate File Count
     if not files or len(files) < 1 or len(files) > 10:
+        record_school_error(
+            "invalid_file_count",
+            "User tried to process an invalid number of images.",
+            session=session,
+            severity="warning",
+            context=f"Submitted files: {len(files) if files else 0}",
+        )
         raise HTTPException(
             status_code=400,
             detail={
@@ -352,6 +505,17 @@ async def api_process_images(
 
     quota_check = check_device_quota(session, len(files))
     if not quota_check["allowed"]:
+        quota = quota_check.get("quota") or {}
+        record_school_error(
+            quota_check.get("reason") or "quota_error",
+            quota_check["message"],
+            session=session,
+            severity="block",
+            context=(
+                f"Requested: {len(files)}; limit: {quota.get('photo_limit')}; "
+                f"used: {quota.get('photos_used')}; remaining: {quota.get('remaining')}"
+            ),
+        )
         raise HTTPException(
             status_code=403,
             detail={
@@ -379,10 +543,18 @@ async def api_process_images(
         valid_mimetypes = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
         
         if ext not in valid_extensions and content_type not in valid_mimetypes:
-            failed_images.append({
+            failure = {
                 "original_name": filename,
                 "reason": "Unsupported format. Only JPG, JPEG, PNG, and WEBP are allowed.",
-            })
+            }
+            failed_images.append(failure)
+            record_school_error(
+                "unsupported_file_format",
+                failure["reason"],
+                session=session,
+                severity="warning",
+                context=f"File: {filename}; content_type: {content_type or 'unknown'}",
+            )
             continue
             
         # Read file bytes to check size and process
@@ -392,10 +564,18 @@ async def api_process_images(
         # Validate File Size (10MB limit)
         max_size_bytes = 10 * 1024 * 1024  # 10MB
         if file_size > max_size_bytes:
-            failed_images.append({
+            failure = {
                 "original_name": filename,
                 "reason": "File exceeds the 10MB limit.",
-            })
+            }
+            failed_images.append(failure)
+            record_school_error(
+                "file_too_large",
+                failure["reason"],
+                session=session,
+                severity="warning",
+                context=f"File: {filename}; size_bytes: {file_size}",
+            )
             continue
             
         try:
@@ -424,10 +604,18 @@ async def api_process_images(
             # Catch ALL exceptions including SystemExit from onnxruntime
             # so the server process itself never dies
             error_msg = str(e) if str(e) else type(e).__name__
-            failed_images.append({
+            failure = {
                 "original_name": filename,
                 "reason": f"Processing failed: {error_msg}",
-            })
+            }
+            failed_images.append(failure)
+            record_school_error(
+                "image_processing_error",
+                failure["reason"],
+                session=session,
+                severity="error",
+                context=f"File: {filename}",
+            )
             
     # 4. Generate ZIP if multiple images
     zip_url = None
@@ -453,6 +641,13 @@ async def api_process_images(
                 )
         except Exception as e:
             print(f"Error creating ZIP: {e}")
+            record_school_error(
+                "zip_creation_error",
+                f"ZIP creation failed: {e}",
+                session=session,
+                severity="warning",
+                context=f"Processed images in batch: {len(processed_images)}",
+            )
             # Non-fatal error: user can still download individually
             
     # 5. Save image records and update processed count in database

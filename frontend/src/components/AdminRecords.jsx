@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowLeft,
   CheckCircle2,
   Database,
@@ -71,6 +72,37 @@ function downloadCsv(rows) {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+function formatEventType(value) {
+  return String(value || 'error')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function errorTone(severity) {
+  if (severity === 'block') {
+    return {
+      border: 'border-red-100',
+      bg: 'bg-red-50/70',
+      icon: 'bg-red-100 text-red-700',
+      badge: 'bg-red-100 text-red-700',
+    };
+  }
+  if (severity === 'error') {
+    return {
+      border: 'border-orange-100',
+      bg: 'bg-orange-50/70',
+      icon: 'bg-orange-100 text-orange-700',
+      badge: 'bg-orange-100 text-orange-700',
+    };
+  }
+  return {
+    border: 'border-amber-100',
+    bg: 'bg-amber-50/50',
+    icon: 'bg-amber-100 text-amber-700',
+    badge: 'bg-amber-100 text-amber-700',
+  };
 }
 
 function LimitRequestCard({ item, device, saving, onApprove }) {
@@ -170,6 +202,7 @@ export default function AdminRecords({ onBack }) {
   const schools = useMemo(() => records?.schools || records?.sessions || [], [records]);
   const feedback = useMemo(() => records?.feedback || [], [records]);
   const limitRequests = useMemo(() => records?.limit_requests || [], [records]);
+  const errorEvents = useMemo(() => records?.error_events || [], [records]);
   const deviceLimits = useMemo(() => records?.device_limits || [], [records]);
   const deviceById = useMemo(() => {
     const map = new Map();
@@ -183,6 +216,7 @@ export default function AdminRecords({ onBack }) {
     { label: 'Photos', value: records?.total_images || 0 },
     { label: 'Limit Requests', value: records?.total_limit_requests || 0 },
     { label: 'Feedback', value: records?.total_feedback || 0 },
+    { label: 'Errors', value: records?.total_error_events || 0 },
   ]), [records]);
 
   const fetchRecords = async (event) => {
@@ -307,13 +341,88 @@ export default function AdminRecords({ onBack }) {
 
       {records && (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3">
             {totals.map((item) => (
               <div key={item.label} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
                 <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">{item.label}</p>
                 <p className="mt-1 text-3xl font-black text-slate-800">{item.value}</p>
               </div>
             ))}
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                  <AlertTriangle size={19} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-800">School Error Events</h3>
+                  <p className="text-xs font-semibold text-slate-400">
+                    Limit, machine, login, and processing problems reported by schools.
+                  </p>
+                </div>
+              </div>
+              <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700">
+                {records.total_error_events || 0} total
+              </span>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {errorEvents.map((item) => {
+                const tone = errorTone(item.severity);
+                return (
+                  <div key={item.id} className={`rounded-2xl border ${tone.border} ${tone.bg} p-4`}>
+                    <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-sm font-black text-slate-800">EMIS {item.emis_code || 'N/A'}</span>
+                          <span className={`rounded-full px-2 py-1 text-[10px] font-black ${tone.badge}`}>
+                            {formatEventType(item.event_type)}
+                          </span>
+                          {item.school_name && (
+                            <span className="max-w-64 truncate rounded-full bg-white px-2 py-1 text-[10px] font-bold text-slate-500" title={item.school_name}>
+                              {item.school_name}
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
+                          {item.message}
+                        </p>
+
+                        {item.context && (
+                          <p className="mt-2 whitespace-pre-wrap rounded-xl bg-white/80 px-3 py-2 text-xs font-semibold leading-5 text-slate-600">
+                            {item.context}
+                          </p>
+                        )}
+
+                        <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold text-slate-400">
+                          <span>{item.machine_type || 'Unknown machine'}</span>
+                          {item.machine_id && <span className="max-w-xs truncate font-mono">Machine: {item.machine_id}</span>}
+                          {item.ip_address && <span className="font-mono">IP: {item.ip_address}</span>}
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 text-left lg:text-right">
+                        <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${tone.icon}`}>
+                          <AlertTriangle size={16} />
+                        </div>
+                        <p className="mt-2 font-mono text-xs font-bold text-slate-600">{item.phone_number || 'N/A'}</p>
+                        <p className="mt-1 text-[10px] font-semibold text-slate-400">{formatDate(item.created_at)}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {!errorEvents.length && (
+                <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 px-5 py-8 text-center text-sm font-semibold text-slate-400">
+                  <CheckCircle2 size={16} />
+                  No school error events recorded yet.
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xl">
