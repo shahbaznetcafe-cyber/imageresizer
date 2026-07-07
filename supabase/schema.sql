@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS public.device_limits (
   phone_number TEXT NOT NULL,
   school_name TEXT,
   machine_type TEXT,
-  photo_limit INTEGER NOT NULL DEFAULT 50,
+  photo_limit INTEGER NOT NULL DEFAULT 35,
   photos_used INTEGER NOT NULL DEFAULT 0,
   blocked BOOLEAN NOT NULL DEFAULT FALSE,
   block_reason TEXT,
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS public.limit_requests (
   emis_code TEXT NOT NULL,
   phone_number TEXT NOT NULL,
   school_name TEXT,
-  requested_extra INTEGER NOT NULL DEFAULT 50,
+  requested_extra INTEGER NOT NULL DEFAULT 150,
   message TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -88,6 +88,11 @@ CREATE TABLE IF NOT EXISTS public.problem_reports (
   screenshot_type TEXT,
   screenshot_data_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.app_migrations (
+  migration_key TEXT PRIMARY KEY,
+  applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE public.school_sessions

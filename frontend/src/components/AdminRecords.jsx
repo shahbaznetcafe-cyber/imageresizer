@@ -109,7 +109,7 @@ function errorTone(severity) {
 }
 
 function LimitRequestCard({ item, device, saving, onApprove }) {
-  const suggestedLimit = Number(device?.photo_limit || 50) + Number(item.requested_extra || 50);
+  const suggestedLimit = Number(device?.photo_limit || 35) + Number(item.requested_extra || 150);
   const [nextLimit, setNextLimit] = useState(suggestedLimit);
   const remaining = Math.max(Number(device?.photo_limit || 0) - Number(device?.photos_used || 0), 0);
   const isPending = item.status === 'pending';
@@ -135,7 +135,7 @@ function LimitRequestCard({ item, device, saving, onApprove }) {
           <p className="mt-2 text-xs font-semibold text-slate-500">
             Phone <span className="font-mono text-slate-700">{item.phone_number}</span>
             <span className="mx-2 text-slate-300">|</span>
-            Requested +{item.requested_extra || 50} photos
+            Requested +{item.requested_extra || 150} photos
             <span className="mx-2 text-slate-300">|</span>
             {formatDate(item.created_at)}
           </p>
@@ -157,7 +157,7 @@ function LimitRequestCard({ item, device, saving, onApprove }) {
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="rounded-xl bg-slate-50 p-2">
               <p className="text-[9px] font-black uppercase text-slate-400">Limit</p>
-              <p className="font-mono text-sm font-black text-slate-800">{device?.photo_limit || 50}</p>
+              <p className="font-mono text-sm font-black text-slate-800">{device?.photo_limit || 35}</p>
             </div>
             <div className="rounded-xl bg-slate-50 p-2">
               <p className="text-[9px] font-black uppercase text-slate-400">Used</p>
@@ -393,7 +393,7 @@ export default function AdminRecords({ onBack }) {
                 <div>
                   <h3 className="text-base font-black text-slate-800">Photo Limit Requests</h3>
                   <p className="text-xs font-semibold text-slate-400">
-                    Schools that reached the 50-photo lifetime device quota.
+                    Schools that reached the 35-photo lifetime device quota.
                   </p>
                 </div>
               </div>

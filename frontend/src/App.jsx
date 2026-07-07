@@ -348,7 +348,7 @@ export default function App() {
                   {PERSONAL_MODE || session.quota?.unlimited
                     ? 'Personal unlimited mode'
                     : session.quota
-                    ? `Quota used: ${session.quota.photos_used || 0}/${session.quota.photo_limit || 50} photos`
+                    ? `Quota used: ${session.quota.photos_used || 0}/${session.quota.photo_limit || 35} photos`
                     : `Processed: ${session.processed_count} photos`}
                 </p>
               </div>

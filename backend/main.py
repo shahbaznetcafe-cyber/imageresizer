@@ -456,7 +456,7 @@ def api_feedback(
 @app.post("/api/limit-request")
 def api_limit_request(
     session_id: int = Form(...),
-    requested_extra: int = Form(default=50),
+    requested_extra: int = Form(default=150),
     message: str = Form(default=""),
 ):
     """Stores a quota increase request after the free limit is reached."""

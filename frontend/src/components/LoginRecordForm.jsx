@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { School, Phone, ArrowRight, Loader2, History, LockKeyhole, Building2, MonitorSmartphone, Bug } from 'lucide-react';
+import { School, Phone, ArrowRight, Loader2, History, LockKeyhole, Building2, MonitorSmartphone, Bug, CreditCard } from 'lucide-react';
+import BuyMoreDialog from './BuyMoreDialog';
 import ProblemReportDialog from './ProblemReportDialog';
 import { getApiErrorMessage, getNetworkErrorMessage } from '../utils/apiErrors';
 import { getApiUrl } from '../utils/api';
@@ -52,6 +53,7 @@ export default function LoginRecordForm({ onLoginSuccess, onAdminOpen }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activity, setActivity] = useState(null);
+  const [showBuyMore, setShowBuyMore] = useState(false);
   const [showProblemForm, setShowProblemForm] = useState(false);
 
   const formatDate = (value) => {
@@ -320,6 +322,18 @@ export default function LoginRecordForm({ onLoginSuccess, onAdminOpen }) {
 
         <button
           type="button"
+          onClick={() => setShowBuyMore(true)}
+          className="w-full flex items-center justify-center gap-2 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-black text-amber-700 shadow-sm transition-colors hover:bg-amber-100"
+        >
+          <CreditCard size={17} />
+          Buy More
+          <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-amber-700">
+            Rs. 200 = +150
+          </span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setShowProblemForm(true)}
           className="w-full flex items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-black text-red-700 shadow-sm transition-colors hover:bg-red-100"
         >
@@ -390,6 +404,10 @@ export default function LoginRecordForm({ onLoginSuccess, onAdminOpen }) {
         </button>
         <span className="urdu-text text-[10px] leading-3">پاس ورڈ کی ضرورت نہیں ہے</span>
       </div>
+
+      {showBuyMore && (
+        <BuyMoreDialog onClose={() => setShowBuyMore(false)} />
+      )}
 
       {showProblemForm && (
         <ProblemReportDialog

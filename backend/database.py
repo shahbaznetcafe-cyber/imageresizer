@@ -4,7 +4,9 @@ import tempfile
 from datetime import date, datetime
 from decimal import Decimal
 
-DEFAULT_PHOTO_LIMIT = int(os.getenv("DEFAULT_PHOTO_LIMIT", "50"))
+LEGACY_FREE_PHOTO_LIMIT = 50
+DEFAULT_PHOTO_LIMIT = int(os.getenv("DEFAULT_PHOTO_LIMIT", "35"))
+DEFAULT_LIMIT_REQUEST_EXTRA = 150
 DISABLE_USAGE_LIMITS = os.getenv("DISABLE_USAGE_LIMITS", "").lower() in {
     "1",
     "true",
@@ -184,7 +186,7 @@ def init_db():
                 emis_code TEXT NOT NULL,
                 phone_number TEXT NOT NULL,
                 school_name TEXT,
-                requested_extra INTEGER NOT NULL DEFAULT 50,
+                requested_extra INTEGER NOT NULL DEFAULT 150,
                 message TEXT,
                 status TEXT NOT NULL DEFAULT 'pending',
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -228,6 +230,14 @@ def init_db():
                 screenshot_type TEXT,
                 screenshot_data_url TEXT,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS app_migrations (
+                migration_key TEXT PRIMARY KEY,
+                applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
             """
         )
@@ -317,7 +327,7 @@ def init_db():
                 emis_code TEXT NOT NULL,
                 phone_number TEXT NOT NULL,
                 school_name TEXT,
-                requested_extra INTEGER DEFAULT 50,
+                requested_extra INTEGER DEFAULT 150,
                 message TEXT,
                 status TEXT DEFAULT 'pending',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -365,6 +375,14 @@ def init_db():
                 screenshot_type TEXT,
                 screenshot_data_url TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS app_migrations (
+                migration_key TEXT PRIMARY KEY,
+                applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
@@ -467,9 +485,53 @@ def init_db():
         """
     )
     _bootstrap_device_limits(cursor)
+    _normalize_default_photo_limits(cursor)
     _reject_placeholder_limit_requests(cursor)
     conn.commit()
     conn.close()
+
+
+def _normalize_default_photo_limits(cursor) -> None:
+    """Moves existing free default quota rows from the old limit to the current limit."""
+    if DEFAULT_PHOTO_LIMIT == LEGACY_FREE_PHOTO_LIMIT:
+        return
+
+    migration_key = f"default_photo_limit_{DEFAULT_PHOTO_LIMIT}_from_{LEGACY_FREE_PHOTO_LIMIT}"
+    if IS_POSTGRES:
+        cursor.execute("SELECT 1 FROM app_migrations WHERE migration_key = %s", (migration_key,))
+    else:
+        cursor.execute("SELECT 1 FROM app_migrations WHERE migration_key = ?", (migration_key,))
+    if cursor.fetchone():
+        return
+
+    if IS_POSTGRES:
+        cursor.execute(
+            """
+            UPDATE device_limits
+            SET photo_limit = %s,
+                updated_at = NOW()
+            WHERE photo_limit = %s
+            """,
+            (DEFAULT_PHOTO_LIMIT, LEGACY_FREE_PHOTO_LIMIT),
+        )
+        cursor.execute(
+            "INSERT INTO app_migrations (migration_key) VALUES (%s) ON CONFLICT (migration_key) DO NOTHING",
+            (migration_key,),
+        )
+    else:
+        cursor.execute(
+            """
+            UPDATE device_limits
+            SET photo_limit = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE photo_limit = ?
+            """,
+            (DEFAULT_PHOTO_LIMIT, LEGACY_FREE_PHOTO_LIMIT),
+        )
+        cursor.execute(
+            "INSERT OR IGNORE INTO app_migrations (migration_key) VALUES (?)",
+            (migration_key,),
+        )
 
 
 def _bootstrap_device_limits(cursor) -> None:
@@ -504,7 +566,12 @@ def _bootstrap_device_limits(cursor) -> None:
                 COALESCE((
                     SELECT COUNT(*)
                     FROM processed_images pi
-                    WHERE pi.emis_code = latest_machine.emis_code
+                    WHERE NULLIF(pi.machine_id, '') = latest_machine.machine_id
+                       OR (
+                            latest_machine.ip_address IS NOT NULL
+                            AND COALESCE(pi.machine_id, '') = ''
+                            AND NULLIF(pi.ip_address, '') = latest_machine.ip_address
+                          )
                 ), 0) AS photos_used
             FROM latest_machine
             WHERE NOT EXISTS (
@@ -542,7 +609,12 @@ def _bootstrap_device_limits(cursor) -> None:
             (
                 SELECT COUNT(*)
                 FROM processed_images pi
-                WHERE pi.emis_code = ranked.emis_code
+                WHERE NULLIF(pi.machine_id, '') = ranked.machine_id
+                   OR (
+                        ranked.ip_address IS NOT NULL
+                        AND COALESCE(pi.machine_id, '') = ''
+                        AND NULLIF(pi.ip_address, '') = ranked.ip_address
+                      )
             ) AS photos_used
         FROM ranked
         WHERE ranked.row_number = 1
@@ -629,10 +701,14 @@ def _quota_payload(device: dict | None) -> dict:
     }
 
 
-def _sync_device_usage_from_history(cursor, device_id: int, emis_code: str) -> dict | None:
-    """Keeps quota usage aligned with old rows that did not have machine IDs."""
-    if not device_id or not emis_code:
+def _sync_device_usage_from_history(cursor, device: dict | None) -> dict | None:
+    """Keeps quota usage aligned with rows already tied to this machine/IP."""
+    if not device or not device.get("id"):
         return None
+
+    device_id = device["id"]
+    machine_id = (device.get("machine_id") or "").strip()
+    ip_address = (device.get("ip_address") or "").strip()
 
     if IS_POSTGRES:
         cursor.execute(
@@ -643,7 +719,13 @@ def _sync_device_usage_from_history(cursor, device_id: int, emis_code: str) -> d
                     (
                         SELECT COUNT(*)
                         FROM processed_images
-                        WHERE emis_code = %s
+                        WHERE device_limit_id = %s
+                           OR (NULLIF(machine_id, '') = NULLIF(%s, ''))
+                           OR (
+                                NULLIF(%s, '') IS NOT NULL
+                                AND COALESCE(machine_id, '') = ''
+                                AND NULLIF(ip_address, '') = NULLIF(%s, '')
+                              )
                     )
                 ),
                 updated_at = NOW()
@@ -652,12 +734,22 @@ def _sync_device_usage_from_history(cursor, device_id: int, emis_code: str) -> d
                 school_name, machine_type, photo_limit, photos_used, blocked,
                 block_reason, created_at, updated_at
             """,
-            (emis_code, device_id),
+            (device_id, machine_id, ip_address, ip_address, device_id),
         )
     else:
         cursor.execute(
-            "SELECT COUNT(*) AS image_count FROM processed_images WHERE emis_code = ?",
-            (emis_code,),
+            """
+            SELECT COUNT(*) AS image_count
+            FROM processed_images
+            WHERE device_limit_id = ?
+               OR (NULLIF(machine_id, '') = NULLIF(?, ''))
+               OR (
+                    NULLIF(?, '') IS NOT NULL
+                    AND COALESCE(machine_id, '') = ''
+                    AND NULLIF(ip_address, '') = NULLIF(?, '')
+                  )
+            """,
+            (device_id, machine_id, ip_address, ip_address),
         )
         image_count = int(_row_to_dict(cursor.fetchone())["image_count"] or 0)
         cursor.execute(
@@ -722,7 +814,7 @@ def get_or_create_device_limit(
     machine_type: str = "",
     ip_address: str = "",
 ) -> dict:
-    """Binds one device/IP to one school identity and returns quota details."""
+    """Returns quota details for one machine, with IP as a fallback signal."""
     conn = _connect()
     cursor = conn.cursor()
 
@@ -732,38 +824,21 @@ def get_or_create_device_limit(
 
     matches = _fetch_device_limits(cursor, machine_id, ip_address)
     if DISABLE_USAGE_LIMITS:
-        chosen = next(
-            (
-                item
-                for item in matches
-                if item.get("emis_code") == emis_code and item.get("phone_number") == phone_number
-            ),
-            None,
-        )
+        chosen = next((item for item in matches if item.get("machine_id") == machine_id and machine_id), None)
+        chosen = chosen or next((item for item in matches if item.get("ip_address") == ip_address and ip_address), None)
     else:
         chosen = next((item for item in matches if item.get("machine_id") == machine_id and machine_id), None)
-        chosen = chosen or (matches[0] if matches else None)
+        chosen = chosen or next((item for item in matches if item.get("ip_address") == ip_address and ip_address), None)
 
     if chosen:
-        same_school = chosen.get("emis_code") == emis_code and chosen.get("phone_number") == phone_number
-        if not DISABLE_USAGE_LIMITS and not same_school:
-            conn.close()
-            return {
-                "allowed": False,
-                "reason": "identity_mismatch",
-                "message": (
-                    "This device/IP is already registered for another school. "
-                    "Please use the original EMIS and phone number or contact admin."
-                ),
-                "quota": _quota_payload(chosen),
-                "device": chosen,
-            }
-
         if IS_POSTGRES:
             cursor.execute(
                 """
                 UPDATE device_limits
-                SET school_name = COALESCE(NULLIF(%s, ''), school_name),
+                SET emis_code = %s,
+                    phone_number = %s,
+                    school_name = COALESCE(NULLIF(%s, ''), school_name),
+                    machine_id = COALESCE(NULLIF(%s, ''), machine_id),
                     machine_type = COALESCE(NULLIF(%s, ''), machine_type),
                     ip_address = COALESCE(NULLIF(%s, ''), ip_address),
                     updated_at = NOW()
@@ -772,20 +847,23 @@ def get_or_create_device_limit(
                     school_name, machine_type, photo_limit, photos_used, blocked,
                     block_reason, created_at, updated_at
                 """,
-                (school_name, machine_type, ip_address, chosen["id"]),
+                (emis_code, phone_number, school_name, machine_id, machine_type, ip_address, chosen["id"]),
             )
             row = cursor.fetchone()
         else:
             cursor.execute(
                 """
                 UPDATE device_limits
-                SET school_name = COALESCE(NULLIF(?, ''), school_name),
+                SET emis_code = ?,
+                    phone_number = ?,
+                    school_name = COALESCE(NULLIF(?, ''), school_name),
+                    machine_id = COALESCE(NULLIF(?, ''), machine_id),
                     machine_type = COALESCE(NULLIF(?, ''), machine_type),
                     ip_address = COALESCE(NULLIF(?, ''), ip_address),
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
-                (school_name, machine_type, ip_address, chosen["id"]),
+                (emis_code, phone_number, school_name, machine_id, machine_type, ip_address, chosen["id"]),
             )
             cursor.execute(
                 """
@@ -801,7 +879,7 @@ def get_or_create_device_limit(
 
         conn.commit()
         device = _row_to_dict(row)
-        device = _sync_device_usage_from_history(cursor, device["id"], emis_code) or device
+        device = _sync_device_usage_from_history(cursor, device) or device
         conn.commit()
         conn.close()
         return {"allowed": True, "device": device, "quota": _quota_payload(device)}
@@ -847,7 +925,7 @@ def get_or_create_device_limit(
 
     conn.commit()
     device = _row_to_dict(row)
-    device = _sync_device_usage_from_history(cursor, device["id"], emis_code) or device
+    device = _sync_device_usage_from_history(cursor, device) or device
     conn.commit()
     conn.close()
     return {"allowed": True, "device": device, "quota": _quota_payload(device)}
@@ -1132,7 +1210,7 @@ def add_device_usage(device_limit_id: int | None, add_count: int) -> dict:
 def create_limit_request(session: dict, requested_extra: int, message: str) -> dict:
     conn = _connect()
     cursor = conn.cursor()
-    requested_extra = max(1, min(int(requested_extra or 50), 1000))
+    requested_extra = max(1, min(int(requested_extra or DEFAULT_LIMIT_REQUEST_EXTRA), 1000))
     clean_message = (message or "").strip()[:1500]
 
     if IS_POSTGRES:

@@ -49,13 +49,13 @@ export default function LimitRequestForm({ session, quota }) {
         <div className="min-w-0 flex-1">
           <h2 className="text-xl font-black text-slate-800">Free photo limit reached</h2>
           <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-            This device has completed its free 50-photo quota. Send Rs. 200 by JazzCash or EasyPaisa to request 150 more photos.
+            This device has completed its free 35-photo quota. Send Rs. 200 by JazzCash or EasyPaisa to request 150 more photos.
           </p>
 
           <div className="mt-4 grid grid-cols-3 gap-2">
             <div className="rounded-xl bg-slate-50 p-3 text-center">
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Limit</p>
-              <p className="mt-1 font-mono text-lg font-black text-slate-800">{quota?.photo_limit ?? 50}</p>
+              <p className="mt-1 font-mono text-lg font-black text-slate-800">{quota?.photo_limit ?? 35}</p>
             </div>
             <div className="rounded-xl bg-slate-50 p-3 text-center">
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Used</p>
@@ -73,7 +73,7 @@ export default function LimitRequestForm({ session, quota }) {
         <div className="flex items-start gap-2 text-xs font-bold text-slate-500">
           <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-500" />
           <p>
-            EMIS {session.emis_code} is linked with this device. Changing EMIS or phone from this same machine/IP will be refused.
+            This free quota is linked with this machine/IP. EMIS, school name, and phone can be corrected without resetting usage.
           </p>
         </div>
       </div>
