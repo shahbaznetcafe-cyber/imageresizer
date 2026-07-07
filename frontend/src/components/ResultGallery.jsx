@@ -8,6 +8,16 @@ function getRetryUrl(url, retryCount) {
   return `${url}${separator}preview_retry=${retryCount}&t=${Date.now()}`;
 }
 
+function getJpgDownloadName(name, fallback = 'processed_photo.jpg') {
+  const baseName = String(name || fallback)
+    .split(/[\\/]/)
+    .pop()
+    .replace(/\.[^/.]+$/, '')
+    .trim();
+
+  return `${baseName || 'processed_photo'}.jpg`;
+}
+
 function ImagePreview({ image, getAssetUrl }) {
   const sources = useMemo(() => {
     return [image.data_url, image.url]
@@ -82,11 +92,11 @@ export default function ResultGallery({ results = [], failedImages = [], zipUrl,
     return getApiUrl(url);
   };
 
-  const handleDownload = (url, name) => {
+  const handleDownload = (url, name, forceJpg = true) => {
     // Force download by creating a temporary link
     const link = document.createElement('a');
     link.href = getAssetUrl(url);
-    link.download = name || 'processed_photo.jpg';
+    link.download = forceJpg ? getJpgDownloadName(name) : (name || 'download');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -138,7 +148,7 @@ export default function ResultGallery({ results = [], failedImages = [], zipUrl,
           </a>
           {zipUrl && (
             <button
-              onClick={() => handleDownload(zipUrl, 'sed_punjab_photos.zip')}
+              onClick={() => handleDownload(zipUrl, 'sed_punjab_photos.zip', false)}
               className="w-full sm:w-auto bg-punjab-green hover:bg-punjab-green-dark text-white font-bold py-3.5 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all-custom flex items-center justify-center gap-2 text-sm"
             >
               <Download size={18} />
