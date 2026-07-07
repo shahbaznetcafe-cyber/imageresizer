@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, CreditCard, Loader2, Send, ShieldAlert } f
 import { getApiUrl } from '../utils/api';
 import { getApiErrorMessage } from '../utils/apiErrors';
 
-export default function LimitRequestForm({ session, quota }) {
+export default function LimitRequestForm({ session, quota, isQuotaReached = false, onSubmitted }) {
   const [requestedExtra] = useState(150);
   const [paymentSenderName, setPaymentSenderName] = useState('');
   const [paymentSenderPhone, setPaymentSenderPhone] = useState('');
@@ -40,6 +40,7 @@ export default function LimitRequestForm({ session, quota }) {
       setStatus('Request sent. Admin will verify payment and add 150 photos to this device quota.');
       setPaymentTransactionId('');
       setMessage('');
+      onSubmitted?.();
     } catch (err) {
       setError(err.message || 'Unable to send limit request.');
     } finally {
@@ -54,9 +55,13 @@ export default function LimitRequestForm({ session, quota }) {
           <ShieldAlert size={24} />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-xl font-black text-slate-800">Free photo limit reached</h2>
+          <h2 className="text-xl font-black text-slate-800">
+            {isQuotaReached ? 'Free photo limit reached' : 'Request more photos'}
+          </h2>
           <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-            This device has completed its free 35-photo quota. Send Rs. 200 by JazzCash or EasyPaisa to request 150 more photos.
+            {isQuotaReached
+              ? 'This device has completed its free 35-photo quota. Send Rs. 200 by JazzCash or EasyPaisa to request 150 more photos.'
+              : 'Send Rs. 200 by JazzCash or EasyPaisa, then submit this request with sender phone and transaction ID.'}
           </p>
 
           <div className="mt-4 grid grid-cols-3 gap-2">

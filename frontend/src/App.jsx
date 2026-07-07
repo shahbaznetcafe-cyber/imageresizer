@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { School, LogOut, Check } from 'lucide-react';
+import { CreditCard, School, LogOut, Check, X } from 'lucide-react';
 import LoginRecordForm from './components/LoginRecordForm';
 import UploadArea from './components/UploadArea';
 import CropEditor from './components/CropEditor';
@@ -123,6 +123,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [showAdmin, setShowAdmin] = useState(false);
   const [quotaRestriction, setQuotaRestriction] = useState(null);
+  const [showLimitRequest, setShowLimitRequest] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -305,6 +306,7 @@ export default function App() {
     clearCachedSession();
     setSession(null);
     setQuotaRestriction(null);
+    setShowLimitRequest(false);
     setStep('login');
   };
 
@@ -341,7 +343,7 @@ export default function App() {
           </div>
 
           {session && (
-            <div className="flex items-center gap-4 bg-slate-50 border border-slate-200/50 rounded-xl p-2 pl-3 pr-2.5 shadow-sm text-xs transition-all duration-300">
+            <div className="flex flex-col gap-2 rounded-xl border border-slate-200/50 bg-slate-50 p-2 pl-3 pr-2.5 text-xs shadow-sm transition-all duration-300 sm:flex-row sm:items-center">
               <div className="text-right">
                 <p className="font-semibold text-slate-700 font-mono">EMIS: {session.emis_code}</p>
                 <p className="text-[10px] text-slate-400">
@@ -352,6 +354,16 @@ export default function App() {
                     : `Processed: ${session.processed_count} photos`}
                 </p>
               </div>
+              {!PERSONAL_MODE && !session.quota?.unlimited && !quotaReached && (
+                <button
+                  type="button"
+                  onClick={() => setShowLimitRequest(true)}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] font-black text-amber-700 transition-colors hover:bg-amber-100"
+                >
+                  <CreditCard size={14} />
+                  Request More
+                </button>
+              )}
               <button
                 onClick={handleLogout}
                 className="p-2 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
@@ -436,7 +448,7 @@ export default function App() {
               )}
               {step === 'upload' && (
                 quotaReached ? (
-                  <LimitRequestForm session={session} quota={activeQuota} />
+                  <LimitRequestForm session={session} quota={activeQuota} isQuotaReached />
                 ) : (
                   <UploadArea onFilesSelected={handleFilesSelected} />
                 )
@@ -457,6 +469,22 @@ export default function App() {
 
         {session && !showAdmin && step !== 'login' && step !== 'processing' && (
           <FeedbackDialog session={session} />
+        )}
+
+        {showLimitRequest && session && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/45 px-4 py-6 backdrop-blur-sm sm:py-10">
+            <div className="relative w-full max-w-2xl">
+              <button
+                type="button"
+                onClick={() => setShowLimitRequest(false)}
+                className="absolute right-4 top-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800"
+                aria-label="Close request more photos form"
+              >
+                <X size={16} />
+              </button>
+              <LimitRequestForm session={session} quota={activeQuota} onSubmitted={() => {}} />
+            </div>
+          </div>
         )}
       </main>
 

@@ -408,7 +408,7 @@ export default function AdminRecords({ onBack }) {
                 <div>
                   <h3 className="text-base font-black text-slate-800">Photo Limit Requests</h3>
                   <p className="text-xs font-semibold text-slate-400">
-                    Schools that reached the 35-photo lifetime device quota.
+                    Schools requesting paid +150 photo upgrades for a machine/IP quota.
                   </p>
                 </div>
               </div>

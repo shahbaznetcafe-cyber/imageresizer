@@ -462,7 +462,7 @@ def api_limit_request(
     payment_transaction_id: str = Form(default=""),
     message: str = Form(default=""),
 ):
-    """Stores a quota increase request after the free limit is reached."""
+    """Stores a quota increase request for this machine after payment."""
     session = get_session(session_id)
     if not session or is_session_expired(session):
         raise HTTPException(status_code=404, detail="Session expired. Please log in again.")
@@ -487,24 +487,6 @@ def api_limit_request(
     sender_phone_cleaned = "".join(filter(str.isdigit, payment_sender_phone or ""))
     if len(sender_phone_cleaned) < 10 or len(sender_phone_cleaned) > 15:
         raise HTTPException(status_code=400, detail="Payment sender phone must be 10-15 digits.")
-
-    quota_check = check_device_quota(session, 1)
-    if quota_check["allowed"]:
-        quota = quota_check.get("quota") or {}
-        record_school_error(
-            "limit_request_before_quota",
-            "Limit request submitted while this device still had free quota available.",
-            session=session,
-            severity="warning",
-            context=(
-                f"Requested extra: {requested_extra}; limit: {quota.get('photo_limit')}; "
-                f"used: {quota.get('photos_used')}; remaining: {quota.get('remaining')}"
-            ),
-        )
-        raise HTTPException(
-            status_code=400,
-            detail="This device still has free photo quota available.",
-        )
 
     limit_request = create_limit_request(
         session,
