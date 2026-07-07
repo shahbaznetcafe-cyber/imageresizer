@@ -5,6 +5,9 @@ import { getApiErrorMessage } from '../utils/apiErrors';
 
 export default function LimitRequestForm({ session, quota }) {
   const [requestedExtra] = useState(150);
+  const [paymentSenderName, setPaymentSenderName] = useState('');
+  const [paymentSenderPhone, setPaymentSenderPhone] = useState('');
+  const [paymentTransactionId, setPaymentTransactionId] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
@@ -19,6 +22,9 @@ export default function LimitRequestForm({ session, quota }) {
     const formData = new FormData();
     formData.append('session_id', session.id);
     formData.append('requested_extra', String(requestedExtra));
+    formData.append('payment_sender_name', paymentSenderName.trim());
+    formData.append('payment_sender_phone', paymentSenderPhone.trim());
+    formData.append('payment_transaction_id', paymentTransactionId.trim());
     formData.append('message', message.trim());
 
     try {
@@ -32,6 +38,7 @@ export default function LimitRequestForm({ session, quota }) {
       }
 
       setStatus('Request sent. Admin will verify payment and add 150 photos to this device quota.');
+      setPaymentTransactionId('');
       setMessage('');
     } catch (err) {
       setError(err.message || 'Unable to send limit request.');
@@ -115,6 +122,15 @@ export default function LimitRequestForm({ session, quota }) {
       </div>
 
       <form onSubmit={submitRequest} className="mt-5 space-y-4">
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+          <p className="text-xs font-black uppercase tracking-wider text-blue-400">Request identity</p>
+          <div className="mt-2 grid gap-2 text-xs font-bold text-blue-900 sm:grid-cols-3">
+            <span>EMIS: <span className="font-mono">{session.emis_code}</span></span>
+            <span className="truncate">School: {session.school_name || 'N/A'}</span>
+            <span>Login phone: <span className="font-mono">{session.phone_number}</span></span>
+          </div>
+        </div>
+
         <div>
           <label className="mb-2 block text-xs font-black uppercase tracking-wider text-slate-400">
             Extra photos required
@@ -124,16 +140,58 @@ export default function LimitRequestForm({ session, quota }) {
           </div>
         </div>
 
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="space-y-2 text-xs font-black uppercase tracking-wider text-slate-400">
+            Payment sender name
+            <input
+              type="text"
+              value={paymentSenderName}
+              onChange={(event) => setPaymentSenderName(event.target.value)}
+              maxLength={120}
+              placeholder="Name shown in JazzCash/EasyPaisa"
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold normal-case tracking-normal text-slate-700 outline-none focus:border-punjab-green focus:ring-4 focus:ring-green-50"
+            />
+          </label>
+
+          <label className="space-y-2 text-xs font-black uppercase tracking-wider text-slate-400">
+            Payment sender phone
+            <input
+              type="tel"
+              value={paymentSenderPhone}
+              onChange={(event) => setPaymentSenderPhone(event.target.value)}
+              required
+              minLength={10}
+              maxLength={15}
+              placeholder="03001234567"
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-center font-mono text-sm font-black tracking-widest text-slate-700 outline-none focus:border-punjab-green focus:ring-4 focus:ring-green-50"
+            />
+          </label>
+        </div>
+
         <div>
           <label className="mb-2 block text-xs font-black uppercase tracking-wider text-slate-400">
-            Payment proof / message for admin
+            Transaction ID / reference
+          </label>
+          <input
+            type="text"
+            value={paymentTransactionId}
+            onChange={(event) => setPaymentTransactionId(event.target.value)}
+            maxLength={120}
+            placeholder="Optional, but best for quick verification"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-mono text-sm font-black text-slate-700 outline-none focus:border-punjab-green focus:ring-4 focus:ring-green-50"
+          />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-xs font-black uppercase tracking-wider text-slate-400">
+            Extra message for admin
           </label>
           <textarea
             value={message}
             onChange={(event) => setMessage(event.target.value)}
             rows={4}
             maxLength={1500}
-            placeholder="Write payment sender number, transaction ID, or request details..."
+            placeholder="Write any extra payment or school details..."
             className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 outline-none focus:border-punjab-green focus:ring-4 focus:ring-green-50"
           />
         </div>

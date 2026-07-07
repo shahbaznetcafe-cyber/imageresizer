@@ -187,6 +187,9 @@ def init_db():
                 phone_number TEXT NOT NULL,
                 school_name TEXT,
                 requested_extra INTEGER NOT NULL DEFAULT 150,
+                payment_sender_name TEXT,
+                payment_sender_phone TEXT,
+                payment_transaction_id TEXT,
                 message TEXT,
                 status TEXT NOT NULL DEFAULT 'pending',
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -328,6 +331,9 @@ def init_db():
                 phone_number TEXT NOT NULL,
                 school_name TEXT,
                 requested_extra INTEGER DEFAULT 150,
+                payment_sender_name TEXT,
+                payment_sender_phone TEXT,
+                payment_transaction_id TEXT,
                 message TEXT,
                 status TEXT DEFAULT 'pending',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -393,6 +399,9 @@ def init_db():
         _ensure_column(cursor, table_name, "machine_type", "TEXT")
         _ensure_column(cursor, table_name, "ip_address", "TEXT")
         _ensure_column(cursor, table_name, "device_limit_id", "BIGINT" if IS_POSTGRES else "INTEGER")
+
+    for column_name in ("payment_sender_name", "payment_sender_phone", "payment_transaction_id"):
+        _ensure_column(cursor, "limit_requests", column_name, "TEXT")
 
     cursor.execute(
         """
@@ -1207,23 +1216,35 @@ def add_device_usage(device_limit_id: int | None, add_count: int) -> dict:
     return _quota_payload(device)
 
 
-def create_limit_request(session: dict, requested_extra: int, message: str) -> dict:
+def create_limit_request(
+    session: dict,
+    requested_extra: int,
+    message: str,
+    payment_sender_name: str = "",
+    payment_sender_phone: str = "",
+    payment_transaction_id: str = "",
+) -> dict:
     conn = _connect()
     cursor = conn.cursor()
     requested_extra = max(1, min(int(requested_extra or DEFAULT_LIMIT_REQUEST_EXTRA), 1000))
     clean_message = (message or "").strip()[:1500]
+    sender_name = (payment_sender_name or "").strip()[:120]
+    sender_phone = "".join(filter(str.isdigit, payment_sender_phone or ""))[:30]
+    transaction_id = (payment_transaction_id or "").strip()[:120]
 
     if IS_POSTGRES:
         cursor.execute(
             """
             INSERT INTO limit_requests (
                 session_id, device_limit_id, machine_id, ip_address, emis_code,
-                phone_number, school_name, requested_extra, message
+                phone_number, school_name, requested_extra, payment_sender_name,
+                payment_sender_phone, payment_transaction_id, message
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id, session_id, device_limit_id, machine_id, ip_address,
-                emis_code, phone_number, school_name, requested_extra, message,
-                status, created_at, resolved_at
+                emis_code, phone_number, school_name, requested_extra,
+                payment_sender_name, payment_sender_phone, payment_transaction_id,
+                message, status, created_at, resolved_at
             """,
             (
                 session["id"],
@@ -1234,6 +1255,9 @@ def create_limit_request(session: dict, requested_extra: int, message: str) -> d
                 session["phone_number"],
                 session.get("school_name") or "",
                 requested_extra,
+                sender_name,
+                sender_phone,
+                transaction_id,
                 clean_message,
             ),
         )
@@ -1243,9 +1267,10 @@ def create_limit_request(session: dict, requested_extra: int, message: str) -> d
             """
             INSERT INTO limit_requests (
                 session_id, device_limit_id, machine_id, ip_address, emis_code,
-                phone_number, school_name, requested_extra, message
+                phone_number, school_name, requested_extra, payment_sender_name,
+                payment_sender_phone, payment_transaction_id, message
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 session["id"],
@@ -1256,6 +1281,9 @@ def create_limit_request(session: dict, requested_extra: int, message: str) -> d
                 session["phone_number"],
                 session.get("school_name") or "",
                 requested_extra,
+                sender_name,
+                sender_phone,
+                transaction_id,
                 clean_message,
             ),
         )
@@ -1263,8 +1291,9 @@ def create_limit_request(session: dict, requested_extra: int, message: str) -> d
         cursor.execute(
             """
             SELECT id, session_id, device_limit_id, machine_id, ip_address,
-                emis_code, phone_number, school_name, requested_extra, message,
-                status, created_at, resolved_at
+                emis_code, phone_number, school_name, requested_extra,
+                payment_sender_name, payment_sender_phone, payment_transaction_id,
+                message, status, created_at, resolved_at
             FROM limit_requests
             WHERE id = ?
             """,
@@ -1799,8 +1828,9 @@ def get_admin_records(limit: int = 500) -> dict:
     cursor.execute(
         f"""
         SELECT id, session_id, device_limit_id, machine_id, ip_address,
-            emis_code, phone_number, school_name, requested_extra, message,
-            status, created_at, resolved_at
+            emis_code, phone_number, school_name, requested_extra,
+            payment_sender_name, payment_sender_phone, payment_transaction_id,
+            message, status, created_at, resolved_at
         FROM limit_requests
         WHERE {VALID_SCHOOL_IDENTITY_WHERE}
         ORDER BY

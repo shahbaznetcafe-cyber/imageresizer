@@ -457,6 +457,9 @@ def api_feedback(
 def api_limit_request(
     session_id: int = Form(...),
     requested_extra: int = Form(default=150),
+    payment_sender_name: str = Form(default=""),
+    payment_sender_phone: str = Form(default=""),
+    payment_transaction_id: str = Form(default=""),
     message: str = Form(default=""),
 ):
     """Stores a quota increase request after the free limit is reached."""
@@ -481,6 +484,10 @@ def api_limit_request(
             detail="Please log in again with real EMIS, school name, and phone number before sending a limit request.",
         )
 
+    sender_phone_cleaned = "".join(filter(str.isdigit, payment_sender_phone or ""))
+    if len(sender_phone_cleaned) < 10 or len(sender_phone_cleaned) > 15:
+        raise HTTPException(status_code=400, detail="Payment sender phone must be 10-15 digits.")
+
     quota_check = check_device_quota(session, 1)
     if quota_check["allowed"]:
         quota = quota_check.get("quota") or {}
@@ -499,7 +506,14 @@ def api_limit_request(
             detail="This device still has free photo quota available.",
         )
 
-    limit_request = create_limit_request(session, requested_extra, message)
+    limit_request = create_limit_request(
+        session,
+        requested_extra,
+        message,
+        payment_sender_name=payment_sender_name,
+        payment_sender_phone=sender_phone_cleaned,
+        payment_transaction_id=payment_transaction_id,
+    )
     return {"success": True, "request": limit_request}
 
 

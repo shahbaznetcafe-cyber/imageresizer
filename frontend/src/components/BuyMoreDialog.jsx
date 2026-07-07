@@ -58,7 +58,7 @@ export default function BuyMoreDialog({ onClose }) {
           <div className="flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-3 text-xs font-bold leading-5 text-blue-800">
             <Info size={16} className="mt-0.5 shrink-0" />
             <p>
-              After payment, log in with your school EMIS and send the upgrade request with sender number or transaction ID.
+              After payment, log in with your school EMIS and send the upgrade request with payment sender phone and transaction ID.
             </p>
           </div>
         </div>

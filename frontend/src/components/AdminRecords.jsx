@@ -133,12 +133,27 @@ function LimitRequestCard({ item, device, saving, onApprove }) {
           </div>
 
           <p className="mt-2 text-xs font-semibold text-slate-500">
-            Phone <span className="font-mono text-slate-700">{item.phone_number}</span>
+            Login phone <span className="font-mono text-slate-700">{item.phone_number}</span>
             <span className="mx-2 text-slate-300">|</span>
             Requested +{item.requested_extra || 150} photos
             <span className="mx-2 text-slate-300">|</span>
             {formatDate(item.created_at)}
           </p>
+
+          <div className="mt-3 grid gap-2 rounded-2xl border border-blue-100 bg-blue-50/70 p-3 text-xs font-bold text-blue-900 sm:grid-cols-3">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-wider text-blue-400">Payer name</p>
+              <p className="mt-1 truncate">{item.payment_sender_name || 'Not written'}</p>
+            </div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-wider text-blue-400">Sender phone</p>
+              <p className="mt-1 font-mono">{item.payment_sender_phone || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-wider text-blue-400">Transaction ID</p>
+              <p className="mt-1 truncate font-mono">{item.payment_transaction_id || 'N/A'}</p>
+            </div>
+          </div>
 
           {item.message && (
             <p className="mt-3 whitespace-pre-wrap rounded-xl bg-white px-3 py-2 text-sm font-semibold leading-6 text-slate-700">
