@@ -74,6 +74,22 @@ CREATE TABLE IF NOT EXISTS public.limit_requests (
   resolved_at TIMESTAMPTZ
 );
 
+CREATE TABLE IF NOT EXISTS public.problem_reports (
+  id BIGSERIAL PRIMARY KEY,
+  emis_code TEXT NOT NULL,
+  phone_number TEXT NOT NULL,
+  school_name TEXT NOT NULL,
+  reporter_name TEXT,
+  machine_id TEXT,
+  machine_type TEXT,
+  ip_address TEXT,
+  problem_message TEXT,
+  screenshot_name TEXT,
+  screenshot_type TEXT,
+  screenshot_data_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 ALTER TABLE public.school_sessions
   ADD COLUMN IF NOT EXISTS school_name TEXT,
   ADD COLUMN IF NOT EXISTS machine_id TEXT,
@@ -124,19 +140,28 @@ CREATE INDEX IF NOT EXISTS idx_device_limits_ip_address
 CREATE INDEX IF NOT EXISTS idx_limit_requests_status
   ON public.limit_requests(status);
 
+CREATE INDEX IF NOT EXISTS idx_problem_reports_created_at
+  ON public.problem_reports(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_problem_reports_emis_code
+  ON public.problem_reports(emis_code);
+
 ALTER TABLE public.school_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.processed_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feedback_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.device_limits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.limit_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.problem_reports ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON TABLE public.school_sessions FROM anon, authenticated;
 REVOKE ALL ON TABLE public.processed_images FROM anon, authenticated;
 REVOKE ALL ON TABLE public.feedback_entries FROM anon, authenticated;
 REVOKE ALL ON TABLE public.device_limits FROM anon, authenticated;
 REVOKE ALL ON TABLE public.limit_requests FROM anon, authenticated;
+REVOKE ALL ON TABLE public.problem_reports FROM anon, authenticated;
 REVOKE ALL ON SEQUENCE public.school_sessions_id_seq FROM anon, authenticated;
 REVOKE ALL ON SEQUENCE public.processed_images_id_seq FROM anon, authenticated;
 REVOKE ALL ON SEQUENCE public.feedback_entries_id_seq FROM anon, authenticated;
 REVOKE ALL ON SEQUENCE public.device_limits_id_seq FROM anon, authenticated;
 REVOKE ALL ON SEQUENCE public.limit_requests_id_seq FROM anon, authenticated;
+REVOKE ALL ON SEQUENCE public.problem_reports_id_seq FROM anon, authenticated;

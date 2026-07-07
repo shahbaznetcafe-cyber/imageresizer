@@ -2,9 +2,11 @@ import React, { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
+  Bug,
   CheckCircle2,
   Database,
   Download,
+  Eye,
   LockKeyhole,
   MessageSquareText,
   RefreshCw,
@@ -200,11 +202,14 @@ export default function AdminRecords({ onBack }) {
   const [loading, setLoading] = useState(false);
   const [savingLimit, setSavingLimit] = useState(null);
   const [showErrorEvents, setShowErrorEvents] = useState(false);
+  const [showProblemReports, setShowProblemReports] = useState(false);
+  const [selectedProblem, setSelectedProblem] = useState(null);
 
   const schools = useMemo(() => records?.schools || records?.sessions || [], [records]);
   const feedback = useMemo(() => records?.feedback || [], [records]);
   const limitRequests = useMemo(() => records?.limit_requests || [], [records]);
   const errorEvents = useMemo(() => records?.error_events || [], [records]);
+  const problemReports = useMemo(() => records?.problem_reports || [], [records]);
   const deviceLimits = useMemo(() => records?.device_limits || [], [records]);
   const deviceById = useMemo(() => {
     const map = new Map();
@@ -219,6 +224,7 @@ export default function AdminRecords({ onBack }) {
     { label: 'Limit Requests', value: records?.total_limit_requests || 0 },
     { label: 'Feedback', value: records?.total_feedback || 0 },
     { label: 'Errors', value: records?.total_error_events || 0 },
+    { label: 'Problems', value: records?.total_problem_reports || 0 },
   ]), [records]);
 
   const fetchRecords = async (event) => {
@@ -293,17 +299,30 @@ export default function AdminRecords({ onBack }) {
 
           <div className="flex items-center gap-2">
             {records && (
-              <button
-                type="button"
-                onClick={() => setShowErrorEvents(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-2.5 text-xs font-black text-red-700 hover:bg-red-100 transition-colors"
-              >
-                <AlertTriangle size={15} />
-                Errors
-                <span className="rounded-full bg-white px-2 py-0.5 font-mono text-[10px]">
-                  {records.total_error_events || 0}
-                </span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowProblemReports(true)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50 px-4 py-2.5 text-xs font-black text-amber-700 hover:bg-amber-100 transition-colors"
+                >
+                  <Bug size={15} />
+                  Problems
+                  <span className="rounded-full bg-white px-2 py-0.5 font-mono text-[10px]">
+                    {records.total_problem_reports || 0}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowErrorEvents(true)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-2.5 text-xs font-black text-red-700 hover:bg-red-100 transition-colors"
+                >
+                  <AlertTriangle size={15} />
+                  Errors
+                  <span className="rounded-full bg-white px-2 py-0.5 font-mono text-[10px]">
+                    {records.total_error_events || 0}
+                  </span>
+                </button>
+              </>
             )}
             <button
               type="button"
@@ -356,7 +375,7 @@ export default function AdminRecords({ onBack }) {
 
       {records && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
             {totals.map((item) => (
               <div key={item.label} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
                 <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">{item.label}</p>
@@ -539,6 +558,165 @@ export default function AdminRecords({ onBack }) {
               </div>
             )}
           </div>
+
+          {showProblemReports && (
+            <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm sm:py-10">
+              <div className="flex max-h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-amber-100 bg-white shadow-2xl">
+                <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                      <Bug size={19} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-slate-800">School Problem Reports</h3>
+                      <p className="text-xs font-semibold text-slate-400">
+                        Click any school row to view complete report data and screenshot.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
+                      {records.total_problem_reports || 0} total
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProblemReports(false);
+                        setSelectedProblem(null);
+                      }}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800"
+                      aria-label="Close problem reports"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_380px]">
+                  <div className="min-h-0 overflow-y-auto border-b border-slate-100 lg:border-b-0 lg:border-r">
+                    <table className="min-w-full text-left text-sm">
+                      <thead className="sticky top-0 bg-slate-50 text-[10px] uppercase tracking-wider text-slate-400">
+                        <tr>
+                          <th className="px-4 py-3 font-black">School</th>
+                          <th className="px-4 py-3 font-black">EMIS</th>
+                          <th className="px-4 py-3 font-black">Phone</th>
+                          <th className="px-4 py-3 font-black">Problem</th>
+                          <th className="px-4 py-3 font-black">Date</th>
+                          <th className="px-4 py-3 font-black">Open</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {problemReports.map((item) => {
+                          const isActive = Number((selectedProblem || problemReports[0])?.id) === Number(item.id);
+                          return (
+                            <tr
+                              key={item.id}
+                              onClick={() => setSelectedProblem(item)}
+                              className={`cursor-pointer transition-colors hover:bg-amber-50/50 ${isActive ? 'bg-amber-50/70' : ''}`}
+                            >
+                              <td className="px-4 py-3 text-xs font-black text-slate-800 min-w-48">
+                                <span className="block max-w-56 truncate" title={item.school_name || ''}>
+                                  {item.school_name || 'N/A'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 font-mono text-xs font-black text-slate-700">{item.emis_code}</td>
+                              <td className="px-4 py-3 font-mono text-xs font-bold text-slate-600">{item.phone_number}</td>
+                              <td className="px-4 py-3 text-xs font-semibold text-slate-600 min-w-64">
+                                <span className="block max-w-80 truncate" title={item.problem_message || ''}>
+                                  {item.problem_message || 'No written details'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-[10px] font-semibold text-slate-400">{formatDate(item.created_at)}</td>
+                              <td className="px-4 py-3">
+                                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white text-punjab-blue shadow-sm">
+                                  <Eye size={14} />
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+
+                    {!problemReports.length && (
+                      <div className="flex items-center justify-center gap-2 px-5 py-10 text-center text-sm font-semibold text-slate-400">
+                        <CheckCircle2 size={16} />
+                        No problem reports submitted yet.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="min-h-0 overflow-y-auto bg-slate-50 p-5">
+                    {(() => {
+                      const item = selectedProblem || problemReports[0];
+                      if (!item) {
+                        return (
+                          <div className="rounded-xl border border-dashed border-slate-200 bg-white px-5 py-8 text-center text-sm font-semibold text-slate-400">
+                            Select a problem report to view full data.
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="space-y-4">
+                          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Selected School</p>
+                            <h4 className="mt-1 text-base font-black text-slate-800">{item.school_name || 'N/A'}</h4>
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                              <div className="rounded-xl bg-slate-50 p-3">
+                                <p className="font-black uppercase text-slate-400 text-[9px]">EMIS</p>
+                                <p className="mt-1 font-mono font-black text-slate-800">{item.emis_code || 'N/A'}</p>
+                              </div>
+                              <div className="rounded-xl bg-slate-50 p-3">
+                                <p className="font-black uppercase text-slate-400 text-[9px]">Phone</p>
+                                <p className="mt-1 font-mono font-black text-slate-800">{item.phone_number || 'N/A'}</p>
+                              </div>
+                            </div>
+                            <div className="mt-3 space-y-1 text-xs font-semibold text-slate-500">
+                              <p>Reporter: <span className="font-bold text-slate-700">{item.reporter_name || 'N/A'}</span></p>
+                              <p>Date: <span className="font-bold text-slate-700">{formatDate(item.created_at)}</span></p>
+                              <p>Machine: <span className="font-mono text-[10px] text-slate-500">{item.machine_type || 'Unknown machine'}</span></p>
+                              {item.machine_id && (
+                                <p className="break-all">ID: <span className="font-mono text-[10px] text-slate-500">{item.machine_id}</span></p>
+                              )}
+                              {item.ip_address && (
+                                <p>IP: <span className="font-mono text-[10px] text-slate-500">{item.ip_address}</span></p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Problem Details</p>
+                            <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-700">
+                              {item.problem_message || 'No written details provided.'}
+                            </p>
+                          </div>
+
+                          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Screenshot</p>
+                            {item.screenshot_data_url ? (
+                              <a href={item.screenshot_data_url} target="_blank" rel="noreferrer" className="mt-3 block overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                                <img src={item.screenshot_data_url} alt="Problem screenshot" className="max-h-96 w-full object-contain" />
+                              </a>
+                            ) : (
+                              <p className="mt-3 rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm font-semibold text-slate-400">
+                                No screenshot attached.
+                              </p>
+                            )}
+                            {item.screenshot_name && (
+                              <p className="mt-2 truncate text-[10px] font-semibold text-slate-400" title={item.screenshot_name}>
+                                {item.screenshot_name}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {showErrorEvents && (
             <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm sm:py-10">

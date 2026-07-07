@@ -24,6 +24,7 @@ try:
         create_limit_request,
         get_or_create_device_limit,
         record_feedback,
+        record_problem_report,
         record_school_error,
         record_processed_images,
         update_device_limit,
@@ -44,6 +45,7 @@ except ImportError:
         create_limit_request,
         get_or_create_device_limit,
         record_feedback,
+        record_problem_report,
         record_school_error,
         record_processed_images,
         update_device_limit,
@@ -361,6 +363,66 @@ def api_admin_records(x_admin_key: str = Header(default="")):
     if not ADMIN_KEY or x_admin_key != ADMIN_KEY:
         raise HTTPException(status_code=401, detail="Invalid admin key.")
     return get_admin_records()
+
+
+@app.post("/api/problem-report")
+async def api_problem_report(
+    request: Request,
+    emis_code: str = Form(...),
+    phone_number: str = Form(...),
+    school_name: str = Form(...),
+    reporter_name: str = Form(default=""),
+    problem_message: str = Form(default=""),
+    machine_id: str = Form(default=""),
+    machine_type: str = Form(default=""),
+    screenshot: UploadFile | None = File(default=None),
+):
+    """Stores a school-submitted problem report with an optional screenshot."""
+    emis_cleaned = "".join(filter(str.isdigit, emis_code or ""))
+    phone_cleaned = "".join(filter(str.isdigit, phone_number or ""))
+    school_cleaned = " ".join((school_name or "").strip().split())
+
+    if len(emis_cleaned) != 8:
+        raise HTTPException(status_code=400, detail="EMIS code must be exactly 8 digits.")
+    if len(phone_cleaned) < 10 or len(phone_cleaned) > 15:
+        raise HTTPException(status_code=400, detail="Phone number must be 10-15 digits.")
+    if len(school_cleaned) < 2:
+        raise HTTPException(status_code=400, detail="School name is required.")
+
+    screenshot_name = ""
+    screenshot_type = ""
+    screenshot_data_url = ""
+
+    if screenshot and screenshot.filename:
+        screenshot_type = (screenshot.content_type or "").strip().lower()
+        if not screenshot_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Screenshot must be an image file.")
+
+        screenshot_bytes = await screenshot.read()
+        max_screenshot_bytes = 3 * 1024 * 1024
+        if len(screenshot_bytes) > max_screenshot_bytes:
+            raise HTTPException(status_code=400, detail="Screenshot must be 3MB or smaller.")
+
+        screenshot_name = os.path.basename(screenshot.filename)[:180]
+        screenshot_data_url = (
+            f"data:{screenshot_type or 'image/png'};base64,"
+            + base64.b64encode(screenshot_bytes).decode("ascii")
+        )
+
+    report = record_problem_report(
+        emis_code=emis_cleaned,
+        phone_number=phone_cleaned,
+        school_name=school_cleaned,
+        reporter_name=reporter_name,
+        problem_message=problem_message,
+        screenshot_name=screenshot_name,
+        screenshot_type=screenshot_type,
+        screenshot_data_url=screenshot_data_url,
+        machine_id=machine_id,
+        machine_type=machine_type,
+        ip_address=get_client_ip(request),
+    )
+    return {"success": True, "report": report}
 
 
 @app.post("/api/feedback")

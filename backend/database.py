@@ -212,6 +212,25 @@ def init_db():
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS problem_reports (
+                id BIGSERIAL PRIMARY KEY,
+                emis_code TEXT NOT NULL,
+                phone_number TEXT NOT NULL,
+                school_name TEXT NOT NULL,
+                reporter_name TEXT,
+                machine_id TEXT,
+                machine_type TEXT,
+                ip_address TEXT,
+                problem_message TEXT,
+                screenshot_name TEXT,
+                screenshot_type TEXT,
+                screenshot_data_url TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
     else:
         cursor.execute(
             """
@@ -330,6 +349,25 @@ def init_db():
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS problem_reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                emis_code TEXT NOT NULL,
+                phone_number TEXT NOT NULL,
+                school_name TEXT NOT NULL,
+                reporter_name TEXT,
+                machine_id TEXT,
+                machine_type TEXT,
+                ip_address TEXT,
+                problem_message TEXT,
+                screenshot_name TEXT,
+                screenshot_type TEXT,
+                screenshot_data_url TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
 
     for table_name in ("school_sessions", "processed_images"):
         _ensure_column(cursor, table_name, "school_name", "TEXT")
@@ -414,6 +452,18 @@ def init_db():
         """
         CREATE INDEX IF NOT EXISTS idx_school_error_events_event_type
         ON school_error_events(event_type)
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_problem_reports_created_at
+        ON problem_reports(created_at)
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_problem_reports_emis_code
+        ON problem_reports(emis_code)
         """
     )
     _bootstrap_device_limits(cursor)
@@ -1367,6 +1417,92 @@ def record_feedback(session: dict, rating: int, category: str, message: str) -> 
     return _row_to_dict(row)
 
 
+def record_problem_report(
+    emis_code: str,
+    phone_number: str,
+    school_name: str,
+    reporter_name: str = "",
+    problem_message: str = "",
+    screenshot_name: str = "",
+    screenshot_type: str = "",
+    screenshot_data_url: str = "",
+    machine_id: str = "",
+    machine_type: str = "",
+    ip_address: str = "",
+) -> dict:
+    """Stores a school-submitted problem report for admin review."""
+    emis_value = "".join(filter(str.isdigit, emis_code or ""))[:20]
+    phone_value = "".join(filter(str.isdigit, phone_number or ""))[:30]
+    school_value = " ".join((school_name or "").strip().split())[:120]
+    reporter_value = " ".join((reporter_name or "").strip().split())[:120]
+    message_value = (problem_message or "").strip()[:2000]
+    screenshot_name_value = (screenshot_name or "").strip()[:180]
+    screenshot_type_value = (screenshot_type or "").strip()[:80]
+
+    conn = _connect()
+    cursor = conn.cursor()
+
+    values = (
+        emis_value,
+        phone_value,
+        school_value,
+        reporter_value,
+        (machine_id or "").strip()[:120],
+        (machine_type or "").strip()[:120],
+        (ip_address or "").strip()[:80],
+        message_value,
+        screenshot_name_value,
+        screenshot_type_value,
+        screenshot_data_url or "",
+    )
+
+    if IS_POSTGRES:
+        cursor.execute(
+            """
+            INSERT INTO problem_reports (
+                emis_code, phone_number, school_name, reporter_name, machine_id,
+                machine_type, ip_address, problem_message, screenshot_name,
+                screenshot_type, screenshot_data_url
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, emis_code, phone_number, school_name, reporter_name,
+                machine_id, machine_type, ip_address, problem_message,
+                screenshot_name, screenshot_type, screenshot_data_url, created_at
+            """,
+            values,
+        )
+        row = cursor.fetchone()
+    else:
+        cursor.execute(
+            """
+            INSERT INTO problem_reports (
+                emis_code, phone_number, school_name, reporter_name, machine_id,
+                machine_type, ip_address, problem_message, screenshot_name,
+                screenshot_type, screenshot_data_url
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            values,
+        )
+        report_id = cursor.lastrowid
+        cursor.execute(
+            """
+            SELECT id, emis_code, phone_number, school_name, reporter_name,
+                machine_id, machine_type, ip_address, problem_message,
+                screenshot_name, screenshot_type, screenshot_data_url, created_at
+            FROM problem_reports
+            WHERE id = ?
+            """,
+            (report_id,),
+        )
+        row = cursor.fetchone()
+
+    conn.commit()
+    report = _row_to_dict(row)
+    conn.close()
+    return report
+
+
 def get_activity_summary(limit: int = 8) -> dict:
     """Returns live landing-page stats without exposing phone numbers."""
     conn = _connect()
@@ -1479,6 +1615,9 @@ def get_admin_records(limit: int = 500) -> dict:
 
     cursor.execute("SELECT COUNT(*) AS total_error_events FROM school_error_events")
     total_error_events = _row_to_dict(cursor.fetchone())["total_error_events"]
+
+    cursor.execute("SELECT COUNT(*) AS total_problem_reports FROM problem_reports")
+    total_problem_reports = _row_to_dict(cursor.fetchone())["total_problem_reports"]
 
     cursor.execute(
         f"""
@@ -1609,6 +1748,19 @@ def get_admin_records(limit: int = 500) -> dict:
     )
     error_events = [_row_to_dict(row) for row in cursor.fetchall()]
 
+    cursor.execute(
+        f"""
+        SELECT id, emis_code, phone_number, school_name, reporter_name,
+            machine_id, machine_type, ip_address, problem_message,
+            screenshot_name, screenshot_type, screenshot_data_url, created_at
+        FROM problem_reports
+        ORDER BY created_at DESC, id DESC
+        LIMIT {limit_placeholder}
+        """,
+        (min(limit, 150),),
+    )
+    problem_reports = [_row_to_dict(row) for row in cursor.fetchall()]
+
     conn.close()
     return {
         "total_sessions": int(total_sessions or 0),
@@ -1618,10 +1770,12 @@ def get_admin_records(limit: int = 500) -> dict:
         "total_feedback": int(total_feedback or 0),
         "total_limit_requests": int(total_limit_requests or 0),
         "total_error_events": int(total_error_events or 0),
+        "total_problem_reports": int(total_problem_reports or 0),
         "schools": schools,
         "sessions": schools,
         "feedback": feedback,
         "device_limits": device_limits,
         "limit_requests": limit_requests,
         "error_events": error_events,
+        "problem_reports": problem_reports,
     }

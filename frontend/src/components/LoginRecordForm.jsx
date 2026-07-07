@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { School, Phone, ArrowRight, Loader2, History, LockKeyhole, Building2, MonitorSmartphone } from 'lucide-react';
+import { School, Phone, ArrowRight, Loader2, History, LockKeyhole, Building2, MonitorSmartphone, Bug } from 'lucide-react';
+import ProblemReportDialog from './ProblemReportDialog';
 import { getApiErrorMessage, getNetworkErrorMessage } from '../utils/apiErrors';
 import { getApiUrl } from '../utils/api';
 
@@ -51,6 +52,7 @@ export default function LoginRecordForm({ onLoginSuccess, onAdminOpen }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activity, setActivity] = useState(null);
+  const [showProblemForm, setShowProblemForm] = useState(false);
 
   const formatDate = (value) => {
     if (!value) return '';
@@ -315,6 +317,15 @@ export default function LoginRecordForm({ onLoginSuccess, onAdminOpen }) {
             </>
           )}
         </button>
+
+        <button
+          type="button"
+          onClick={() => setShowProblemForm(true)}
+          className="w-full flex items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-black text-red-700 shadow-sm transition-colors hover:bg-red-100"
+        >
+          <Bug size={17} />
+          Report a Problem
+        </button>
       </form>
 
       {activity && (
@@ -379,6 +390,17 @@ export default function LoginRecordForm({ onLoginSuccess, onAdminOpen }) {
         </button>
         <span className="urdu-text text-[10px] leading-3">پاس ورڈ کی ضرورت نہیں ہے</span>
       </div>
+
+      {showProblemForm && (
+        <ProblemReportDialog
+          initialEmisCode={emisCode}
+          initialSchoolName={schoolName}
+          initialPhoneNumber={phoneNumber}
+          machineId={getMachineId()}
+          machineType={getMachineType()}
+          onClose={() => setShowProblemForm(false)}
+        />
+      )}
     </div>
   );
 }
