@@ -539,13 +539,19 @@ async def api_process_images(
         filename = upload_file.filename or "image.jpg"
         ext = os.path.splitext(filename)[1].lower()
         
-        valid_extensions = {".jpg", ".jpeg", ".png", ".webp"}
-        valid_mimetypes = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
+        valid_extensions = {
+            ".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff", ".bmp", ".gif",
+            ".jfif", ".avif", ".heic", ".heif",
+        }
+        valid_mimetypes = {
+            "image/jpeg", "image/jpg", "image/png", "image/webp", "image/tiff",
+            "image/bmp", "image/gif", "image/avif", "image/heic", "image/heif",
+        }
         
         if ext not in valid_extensions and content_type not in valid_mimetypes:
             failure = {
                 "original_name": filename,
-                "reason": "Unsupported format. Only JPG, JPEG, PNG, and WEBP are allowed.",
+                "reason": "Unsupported format. Please upload a valid image file.",
             }
             failed_images.append(failure)
             record_school_error(

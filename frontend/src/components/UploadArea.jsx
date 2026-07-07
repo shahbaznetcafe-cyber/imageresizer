@@ -19,8 +19,8 @@ export default function UploadArea({ onFilesSelected }) {
       return;
     }
 
-    const validExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
-    const validMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const validExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.bmp', '.gif', '.jfif', '.avif', '.heic', '.heif'];
+    const validMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/tiff', 'image/bmp', 'image/gif', 'image/avif', 'image/heic', 'image/heif'];
     const maxSizeBytes = 10 * 1024 * 1024; // 10MB
 
     for (let file of files) {
@@ -30,8 +30,8 @@ export default function UploadArea({ onFilesSelected }) {
 
       if (!isValidExt && !isValidMime) {
         setError({
-          en: `Unsupported format for '${file.name}'. Only JPG, JPEG, PNG, and WEBP are allowed.`,
-          ur: `فائل '${file.name}' غیر معاون یافتہ فارمیٹ کی ہے۔ صرف JPG, JPEG, PNG اور WEBP کی اجازت ہے۔`
+          en: `Unsupported format for '${file.name}'. Please upload a valid image file.`,
+          ur: `فائل '${file.name}' غیر معاون یافتہ فارمیٹ کی ہے۔ براہ کرم درست تصویر اپ لوڈ کریں۔`
         });
         return;
       }
@@ -50,7 +50,9 @@ export default function UploadArea({ onFilesSelected }) {
         newFiles.push({
           file: file,
           previewUrl: URL.createObjectURL(file),
-          sizeKb: (file.size / 1024).toFixed(1)
+          sizeKb: (file.size / 1024).toFixed(1),
+          canCropInBrowser: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/avif'].includes(file.type)
+            || ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif', '.jfif'].includes(ext)
         });
       }
     }
@@ -119,7 +121,7 @@ export default function UploadArea({ onFilesSelected }) {
           ref={fileInputRef}
           onChange={handleFileChange}
           multiple
-          accept=".jpg,.jpeg,.png,.webp"
+          accept="image/*,.jpg,.jpeg,.png,.webp,.tif,.tiff,.bmp,.gif,.jfif,.avif,.heic,.heif"
           className="hidden"
         />
 
@@ -128,7 +130,7 @@ export default function UploadArea({ onFilesSelected }) {
         </div>
 
         <h3 className="text-lg font-bold text-slate-700">Drag & Drop Images</h3>
-        <p className="text-xs text-slate-400 mt-1">Supports JPG, JPEG, PNG, WEBP (Max 10MB per image)</p>
+        <p className="text-xs text-slate-400 mt-1">Supports common image formats; output is always JPG (Max 10MB per image)</p>
         
         <p className="urdu-text text-slate-500 mt-3 text-sm">
           تصاویر کو یہاں کھینچ کر لائیں یا کلک کر کے منتخب کریں <br />
@@ -169,11 +171,17 @@ export default function UploadArea({ onFilesSelected }) {
                 key={index}
                 className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl relative group overflow-hidden"
               >
-                <img
-                  src={item.previewUrl}
-                  alt="preview"
-                  className="w-12 h-16 object-cover rounded-lg bg-slate-200 border border-slate-200"
-                />
+                {item.canCropInBrowser ? (
+                  <img
+                    src={item.previewUrl}
+                    alt="preview"
+                    className="w-12 h-16 object-cover rounded-lg bg-slate-200 border border-slate-200"
+                  />
+                ) : (
+                  <div className="flex w-12 h-16 items-center justify-center rounded-lg border border-slate-200 bg-slate-200 text-[10px] font-black uppercase text-slate-500">
+                    {(item.file.name.split('.').pop() || 'img').slice(0, 4)}
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-slate-700 truncate">{item.file.name}</p>
                   <p className="text-[10px] text-slate-400 font-mono mt-0.5">{item.sizeKb} KB</p>

@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Star,
+  X,
 } from 'lucide-react';
 import { getApiUrl } from '../utils/api';
 import { getApiErrorMessage } from '../utils/apiErrors';
@@ -198,6 +199,7 @@ export default function AdminRecords({ onBack }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [savingLimit, setSavingLimit] = useState(null);
+  const [showErrorEvents, setShowErrorEvents] = useState(false);
 
   const schools = useMemo(() => records?.schools || records?.sessions || [], [records]);
   const feedback = useMemo(() => records?.feedback || [], [records]);
@@ -290,6 +292,19 @@ export default function AdminRecords({ onBack }) {
           </div>
 
           <div className="flex items-center gap-2">
+            {records && (
+              <button
+                type="button"
+                onClick={() => setShowErrorEvents(true)}
+                className="inline-flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-2.5 text-xs font-black text-red-700 hover:bg-red-100 transition-colors"
+              >
+                <AlertTriangle size={15} />
+                Errors
+                <span className="rounded-full bg-white px-2 py-0.5 font-mono text-[10px]">
+                  {records.total_error_events || 0}
+                </span>
+              </button>
+            )}
             <button
               type="button"
               onClick={onBack}
@@ -348,81 +363,6 @@ export default function AdminRecords({ onBack }) {
                 <p className="mt-1 text-3xl font-black text-slate-800">{item.value}</p>
               </div>
             ))}
-          </div>
-
-          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xl">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600">
-                  <AlertTriangle size={19} />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-slate-800">School Error Events</h3>
-                  <p className="text-xs font-semibold text-slate-400">
-                    Limit, machine, login, and processing problems reported by schools.
-                  </p>
-                </div>
-              </div>
-              <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700">
-                {records.total_error_events || 0} total
-              </span>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              {errorEvents.map((item) => {
-                const tone = errorTone(item.severity);
-                return (
-                  <div key={item.id} className={`rounded-2xl border ${tone.border} ${tone.bg} p-4`}>
-                    <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-mono text-sm font-black text-slate-800">EMIS {item.emis_code || 'N/A'}</span>
-                          <span className={`rounded-full px-2 py-1 text-[10px] font-black ${tone.badge}`}>
-                            {formatEventType(item.event_type)}
-                          </span>
-                          {item.school_name && (
-                            <span className="max-w-64 truncate rounded-full bg-white px-2 py-1 text-[10px] font-bold text-slate-500" title={item.school_name}>
-                              {item.school_name}
-                            </span>
-                          )}
-                        </div>
-
-                        <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
-                          {item.message}
-                        </p>
-
-                        {item.context && (
-                          <p className="mt-2 whitespace-pre-wrap rounded-xl bg-white/80 px-3 py-2 text-xs font-semibold leading-5 text-slate-600">
-                            {item.context}
-                          </p>
-                        )}
-
-                        <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold text-slate-400">
-                          <span>{item.machine_type || 'Unknown machine'}</span>
-                          {item.machine_id && <span className="max-w-xs truncate font-mono">Machine: {item.machine_id}</span>}
-                          {item.ip_address && <span className="font-mono">IP: {item.ip_address}</span>}
-                        </div>
-                      </div>
-
-                      <div className="shrink-0 text-left lg:text-right">
-                        <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${tone.icon}`}>
-                          <AlertTriangle size={16} />
-                        </div>
-                        <p className="mt-2 font-mono text-xs font-bold text-slate-600">{item.phone_number || 'N/A'}</p>
-                        <p className="mt-1 text-[10px] font-semibold text-slate-400">{formatDate(item.created_at)}</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {!errorEvents.length && (
-                <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 px-5 py-8 text-center text-sm font-semibold text-slate-400">
-                  <CheckCircle2 size={16} />
-                  No school error events recorded yet.
-                </div>
-              )}
-            </div>
           </div>
 
           <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xl">
@@ -599,6 +539,95 @@ export default function AdminRecords({ onBack }) {
               </div>
             )}
           </div>
+
+          {showErrorEvents && (
+            <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm sm:py-10">
+              <div className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-red-100 bg-white shadow-2xl">
+                <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                      <AlertTriangle size={19} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-slate-800">School Error Events</h3>
+                      <p className="text-xs font-semibold text-slate-400">
+                        Limit, machine, login, and processing problems reported by schools.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700">
+                      {records.total_error_events || 0} total
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowErrorEvents(false)}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800"
+                      aria-label="Close error events"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-3 overflow-y-auto p-5">
+                  {errorEvents.map((item) => {
+                    const tone = errorTone(item.severity);
+                    return (
+                      <div key={item.id} className={`rounded-2xl border ${tone.border} ${tone.bg} p-4`}>
+                        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono text-sm font-black text-slate-800">EMIS {item.emis_code || 'N/A'}</span>
+                              <span className={`rounded-full px-2 py-1 text-[10px] font-black ${tone.badge}`}>
+                                {formatEventType(item.event_type)}
+                              </span>
+                              {item.school_name && (
+                                <span className="max-w-64 truncate rounded-full bg-white px-2 py-1 text-[10px] font-bold text-slate-500" title={item.school_name}>
+                                  {item.school_name}
+                                </span>
+                              )}
+                            </div>
+
+                            <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
+                              {item.message}
+                            </p>
+
+                            {item.context && (
+                              <p className="mt-2 whitespace-pre-wrap rounded-xl bg-white/80 px-3 py-2 text-xs font-semibold leading-5 text-slate-600">
+                                {item.context}
+                              </p>
+                            )}
+
+                            <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold text-slate-400">
+                              <span>{item.machine_type || 'Unknown machine'}</span>
+                              {item.machine_id && <span className="max-w-xs truncate font-mono">Machine: {item.machine_id}</span>}
+                              {item.ip_address && <span className="font-mono">IP: {item.ip_address}</span>}
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 text-left lg:text-right">
+                            <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${tone.icon}`}>
+                              <AlertTriangle size={16} />
+                            </div>
+                            <p className="mt-2 font-mono text-xs font-bold text-slate-600">{item.phone_number || 'N/A'}</p>
+                            <p className="mt-1 text-[10px] font-semibold text-slate-400">{formatDate(item.created_at)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {!errorEvents.length && (
+                    <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 px-5 py-8 text-center text-sm font-semibold text-slate-400">
+                      <CheckCircle2 size={16} />
+                      No school error events recorded yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

@@ -3,6 +3,14 @@ import Cropper from 'react-easy-crop';
 import { ZoomIn, ArrowRight, ArrowLeft, Crop, Loader2 } from 'lucide-react';
 import { getCroppedImg } from '../utils/cropImage';
 
+function FilePreviewName({ name }) {
+  return (
+    <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-white/15 text-3xl font-black uppercase">
+      {(name?.split('.').pop() || 'img').slice(0, 4)}
+    </div>
+  );
+}
+
 export default function CropEditor({ files, onCroppingDone }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
@@ -12,22 +20,24 @@ export default function CropEditor({ files, onCroppingDone }) {
   const [croppedFiles, setCroppedFiles] = useState([]);
 
   const currentFileItem = files[currentIndex];
+  const canCropCurrent = currentFileItem?.canCropInBrowser !== false;
 
   const onCropComplete = (croppedArea, croppedAreaPixels) => {
     setCroppedAreaPixels(croppedAreaPixels);
   };
 
   const handleNextOrFinish = async () => {
-    if (!croppedAreaPixels) return;
+    if (canCropCurrent && !croppedAreaPixels) return;
 
     setProcessing(true);
     try {
-      // 1. Generate cropped image for current file index
-      const croppedFile = await getCroppedImg(
-        currentFileItem.previewUrl,
-        croppedAreaPixels,
-        currentFileItem.file.name
-      );
+      const croppedFile = canCropCurrent
+        ? await getCroppedImg(
+          currentFileItem.previewUrl,
+          croppedAreaPixels,
+          currentFileItem.file.name
+        )
+        : currentFileItem.file;
 
       const newCroppedFiles = [...croppedFiles];
       // Store cropped file at correct index (overwriting if re-cropped)
@@ -44,6 +54,7 @@ export default function CropEditor({ files, onCroppingDone }) {
         // Reset cropper controls for next image
         setZoom(1);
         setCrop({ x: 0, y: 0 });
+        setCroppedAreaPixels(null);
       } else {
         // All files cropped! Pass them up
         onCroppingDone(newCroppedFiles);
@@ -61,6 +72,7 @@ export default function CropEditor({ files, onCroppingDone }) {
       setCurrentIndex(currentIndex - 1);
       setZoom(1);
       setCrop({ x: 0, y: 0 });
+      setCroppedAreaPixels(null);
     }
   };
 
@@ -86,17 +98,29 @@ export default function CropEditor({ files, onCroppingDone }) {
 
       {/* Cropper Container */}
       <div className="relative w-full h-[400px] bg-slate-900 flex items-center justify-center">
-        <Cropper
-          image={currentFileItem.previewUrl}
-          crop={crop}
-          zoom={zoom}
-          aspect={3 / 4} // Exactly match 600x800 ratio
-          onCropChange={setCrop}
-          onCropComplete={onCropComplete}
-          onZoomChange={setZoom}
-          showGrid={true}
-          restrictPosition={true}
-        />
+        {canCropCurrent ? (
+          <Cropper
+            image={currentFileItem.previewUrl}
+            crop={crop}
+            zoom={zoom}
+            aspect={3 / 4} // Exactly match 600x800 ratio
+            onCropChange={setCrop}
+            onCropComplete={onCropComplete}
+            onZoomChange={setZoom}
+            showGrid={true}
+            restrictPosition={true}
+          />
+        ) : (
+          <div className="mx-6 max-w-md rounded-2xl border border-white/10 bg-white/10 p-6 text-center text-white shadow-xl">
+            <FilePreviewName name={currentFileItem.file.name} />
+            <p className="mt-3 text-sm font-semibold leading-6">
+              This format cannot be preview-cropped in the browser. It will be processed on the server and downloaded as JPG.
+            </p>
+            <p className="mt-2 text-xs text-white/70">
+              Original file will be sent safely; final output remains 600 x 800 JPG.
+            </p>
+          </div>
+        )}
         
         {processing && (
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center text-white z-20">
@@ -110,6 +134,7 @@ export default function CropEditor({ files, onCroppingDone }) {
       {/* Controls Footer */}
       <div className="p-6 bg-slate-50 border-t border-slate-100 space-y-6">
         {/* Zoom Slider */}
+        {canCropCurrent && (
         <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
           <ZoomIn size={18} className="text-slate-400 shrink-0" />
           <input
@@ -123,6 +148,7 @@ export default function CropEditor({ files, onCroppingDone }) {
           />
           <span className="text-xs font-mono font-bold text-slate-500 shrink-0">{zoom.toFixed(1)}x</span>
         </div>
+        )}
 
         {/* Info Box */}
         <div className="p-3 bg-blue-50/50 border border-blue-100/50 rounded-xl flex items-start gap-2.5 text-xs text-punjab-blue-dark">
@@ -153,14 +179,14 @@ export default function CropEditor({ files, onCroppingDone }) {
             {currentIndex < files.length - 1 ? (
               <div className="flex flex-col items-center">
                 <span className="text-sm font-semibold tracking-wide flex items-center gap-1.5">
-                  Crop Next Image <ArrowRight size={16} />
+                  {canCropCurrent ? 'Crop Next Image' : 'Use This Image'} <ArrowRight size={16} />
                 </span>
                 <span className="urdu-text text-[10px] leading-3 text-white/80 font-normal">اگلی تصویر کراپ کریں</span>
               </div>
             ) : (
               <div className="flex flex-col items-center">
                 <span className="text-sm font-semibold tracking-wide flex items-center gap-1.5">
-                  Confirm & Process All <ArrowRight size={16} />
+                  {canCropCurrent ? 'Confirm & Process All' : 'Process as JPG'} <ArrowRight size={16} />
                 </span>
                 <span className="urdu-text text-[10px] leading-3 text-white/80 font-normal">تصدیق کریں اور پروسیس کریں</span>
               </div>
