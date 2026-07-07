@@ -14,7 +14,7 @@ import { getApiErrorMessage, getNetworkErrorMessage } from './utils/apiErrors';
 import { getApiUrl } from './utils/api';
 
 const SESSION_CACHE_KEY = 'pectaa-session-cache-v2';
-const SESSION_CACHE_MS = 2 * 60 * 60 * 1000;
+const SESSION_CACHE_MS = 12 * 60 * 60 * 1000;
 const LOCAL_PERSONAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
 const PERSONAL_MODE = import.meta.env.VITE_PERSONAL_MODE === 'true'
   || LOCAL_PERSONAL_HOSTS.has(window.location.hostname);

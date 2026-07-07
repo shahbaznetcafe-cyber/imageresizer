@@ -57,7 +57,7 @@ except ImportError:
 
 # Initialize FastAPI application
 app = FastAPI(title="PECTAA Image Resizer API")
-SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "2"))
+SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "12"))
 ADMIN_KEY = os.getenv("ADMIN_KEY", "")
 
 # Configure CORS
