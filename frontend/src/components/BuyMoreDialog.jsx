@@ -47,7 +47,7 @@ export default function BuyMoreDialog({ onClose }) {
             </div>
             <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">JazzCash</p>
-              <p className="mt-1 font-mono text-sm font-black text-slate-800">03007673394</p>
+              <p className="mt-1 font-mono text-sm font-black text-slate-800">03001218448</p>
             </div>
             <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">EasyPaisa</p>
