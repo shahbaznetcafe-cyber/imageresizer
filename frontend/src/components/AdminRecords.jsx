@@ -299,8 +299,8 @@ export default function AdminRecords({ onBack }) {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-5">
-      <div className="bg-white border border-slate-100 shadow-xl rounded-2xl p-5">
+    <div className="w-full max-w-7xl mx-auto space-y-4">
+      <div className="bg-white border border-slate-100 shadow-xl rounded-2xl p-4 sm:p-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="h-11 w-11 rounded-xl bg-punjab-blue text-white flex items-center justify-center shadow-sm">
@@ -312,7 +312,7 @@ export default function AdminRecords({ onBack }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {records && (
               <>
                 <button
@@ -390,16 +390,17 @@ export default function AdminRecords({ onBack }) {
 
       {records && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
             {totals.map((item) => (
-              <div key={item.label} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+              <div key={item.label} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
                 <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">{item.label}</p>
-                <p className="mt-1 text-3xl font-black text-slate-800">{item.value}</p>
+                <p className="mt-1 text-2xl font-black text-slate-800">{item.value}</p>
               </div>
             ))}
           </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xl">
+          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-xl sm:p-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
@@ -417,7 +418,7 @@ export default function AdminRecords({ onBack }) {
               </span>
             </div>
 
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 max-h-[420px] space-y-3 overflow-y-auto pr-1">
               {limitRequests.map((item) => (
                 <LimitRequestCard
                   key={item.id}
@@ -437,7 +438,7 @@ export default function AdminRecords({ onBack }) {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xl">
+          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-xl sm:p-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-punjab-blue">
@@ -455,7 +456,7 @@ export default function AdminRecords({ onBack }) {
               </span>
             </div>
 
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 max-h-[420px] space-y-3 overflow-y-auto pr-1">
               {feedback.map((item) => (
                 <div key={item.id} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
                   <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
@@ -508,57 +509,70 @@ export default function AdminRecords({ onBack }) {
               )}
             </div>
           </div>
+          </div>
 
           <div className="bg-white border border-slate-100 shadow-xl rounded-2xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-400">
+            <div className="flex flex-col gap-2 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-base font-black text-slate-800">School Records</h3>
+                <p className="text-xs font-semibold text-slate-400">
+                  {schools.length} schools loaded. Scroll inside this table; CSV still exports all rows.
+                </p>
+              </div>
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-punjab-blue">
+                Compact table
+              </span>
+            </div>
+
+            <div className="max-h-[62vh] overflow-auto">
+              <table className="min-w-full text-left text-xs">
+                <thead className="sticky top-0 z-10 bg-slate-50 text-[10px] uppercase tracking-wider text-slate-400 shadow-sm">
                   <tr>
-                    <th className="px-4 py-3 font-black">EMIS</th>
-                    <th className="px-4 py-3 font-black">School</th>
-                    <th className="px-4 py-3 font-black">Phone</th>
-                    <th className="px-4 py-3 font-black">Machine</th>
-                    <th className="px-4 py-3 font-black">Sessions</th>
-                    <th className="px-4 py-3 font-black">Photos</th>
-                    <th className="px-4 py-3 font-black">First Session</th>
-                    <th className="px-4 py-3 font-black">Last Session</th>
-                    <th className="px-4 py-3 font-black">Last Processed</th>
-                    <th className="px-4 py-3 font-black">Size</th>
+                    <th className="px-3 py-2 font-black">EMIS</th>
+                    <th className="px-3 py-2 font-black">School</th>
+                    <th className="px-3 py-2 font-black">Phone</th>
+                    <th className="px-3 py-2 font-black">Machine</th>
+                    <th className="px-3 py-2 font-black">Sessions</th>
+                    <th className="px-3 py-2 font-black">Photos</th>
+                    <th className="px-3 py-2 font-black">First</th>
+                    <th className="px-3 py-2 font-black">Last</th>
+                    <th className="px-3 py-2 font-black">Processed</th>
+                    <th className="px-3 py-2 font-black">Size</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {schools.map((row) => (
                     <tr key={row.emis_code} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="px-4 py-3 font-mono font-bold text-slate-800">{row.emis_code}</td>
-                      <td className="px-4 py-3 text-xs font-semibold text-slate-700 min-w-44">
-                        <span className="block max-w-52 truncate" title={row.school_name || ''}>
+                      <td className="px-3 py-2 font-mono font-bold text-slate-800">{row.emis_code}</td>
+                      <td className="px-3 py-2 font-semibold text-slate-700 min-w-44">
+                        <span className="block max-w-60 truncate" title={row.school_name || ''}>
                           {row.school_name || 'N/A'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-mono text-slate-700">{row.phone_number}</td>
-                      <td className="px-4 py-3 min-w-52">
-                        <p className="text-xs font-semibold text-slate-700">{row.machine_type || 'N/A'}</p>
-                        <p className="mt-0.5 max-w-52 truncate font-mono text-[10px] text-slate-400" title={row.machine_id || ''}>
+                      <td className="px-3 py-2 font-mono text-slate-700">{row.phone_number}</td>
+                      <td className="px-3 py-2 min-w-48">
+                        <p className="font-semibold text-slate-700">{row.machine_type || 'N/A'}</p>
+                        <p className="mt-0.5 max-w-48 truncate font-mono text-[10px] text-slate-400" title={row.machine_id || ''}>
                           {row.machine_id || 'No machine ID'}
                         </p>
-                        <p className="mt-1 text-[10px] font-bold text-punjab-green">
+                        <p className="mt-0.5 text-[10px] font-bold text-punjab-green">
                           {row.machine_count || 0} machine{Number(row.machine_count || 0) === 1 ? '' : 's'}
                         </p>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-punjab-blue">
+                      <td className="px-3 py-2">
+                        <span className="rounded-full bg-blue-50 px-2 py-0.5 font-black text-punjab-blue">
                           {row.session_count || 0}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-black text-punjab-green">
+                      <td className="px-3 py-2">
+                        <span className="rounded-full bg-green-50 px-2 py-0.5 font-black text-punjab-green">
                           {row.images_recorded || row.session_processed_count || 0}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{formatDate(row.first_session_at)}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{formatDate(row.last_session_at)}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{formatDate(row.last_processed_at)}</td>
-                      <td className="px-4 py-3 text-xs font-mono text-slate-500">
+                      <td className="px-3 py-2 text-slate-500">{formatDate(row.first_session_at)}</td>
+                      <td className="px-3 py-2 text-slate-500">{formatDate(row.last_session_at)}</td>
+                      <td className="px-3 py-2 text-slate-500">{formatDate(row.last_processed_at)}</td>
+                      <td className="px-3 py-2 font-mono text-slate-500">
                         {Number(row.total_size_kb || 0).toFixed(2)} KB
                       </td>
                     </tr>
