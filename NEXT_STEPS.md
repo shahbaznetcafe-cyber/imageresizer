@@ -2,6 +2,11 @@
 
 ## Completed
 
+- Replaced Render-side rembg/ONNX inference with browser-side MODNet background removal, canvas JPEG output, and browser ZIP generation.
+- Added `/api/record-processed-images` so Supabase quotas and admin records update without uploading photos to Render.
+- Removed rembg/ONNX dependencies and Render model environment variables, eliminating the known 512 MB free-instance failure path.
+- Passed frontend lint and production build after the browser-processing change.
+
 - Initial project inspection completed.
 - Missing checkpoint files created.
 - Current uncommitted state documented.
@@ -48,6 +53,8 @@
 - The custom domain will remain unavailable until its DNS record is changed from Vercel to the Render static frontend service.
 
 ## Commands To Run Next
+
+After the Render deploy, process one JPG in Chrome or Edge and confirm the admin count increases. Refresh any old frontend tab first because it still points at the retired server-processing route.
 
 ```bash
 python -m compileall backend

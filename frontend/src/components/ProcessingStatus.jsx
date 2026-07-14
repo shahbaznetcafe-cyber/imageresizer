@@ -40,7 +40,7 @@ export default function ProcessingStatus({ files = [] }) {
           <div className="min-w-0 text-left">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70">SBZ Processing Engine</p>
             <h3 className="mt-1 text-2xl font-black tracking-tight">Processing Images</h3>
-            <p className="mt-1 text-xs font-medium text-white/75">Background removal, resizing, and compression are running.</p>
+            <p className="mt-1 text-xs font-medium text-white/75">Your browser is removing the background, resizing, and compressing.</p>
           </div>
           <div className="relative h-16 w-16 shrink-0 rounded-2xl bg-white/15 flex items-center justify-center">
             <Loader2 className="animate-spin text-white" size={34} />
@@ -132,7 +132,7 @@ export default function ProcessingStatus({ files = [] }) {
         <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-left">
           <p className="text-xs font-bold text-amber-800">Please keep this window open.</p>
           <p className="mt-1 text-[11px] leading-5 text-amber-700/80">
-            First run may take 60-90 seconds while the processing model wakes up. Larger batches become faster after warmup.
+            The first use downloads a processing model to this browser. Later photos are faster, and your image is not sent to Render for background removal.
           </p>
         </div>
 

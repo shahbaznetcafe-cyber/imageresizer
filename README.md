@@ -1,7 +1,7 @@
 # PECTAA Image Resizer
 
 PECTAA Image Resizer is a production-ready, full-stack online web application built for **shahbaznetcafe.com**. It helps computer operators register their sessions (using School EMIS Code and Phone Number) and process student/staff pictures to official specifications:
-- Auto-remove background (using `rembg`).
+- Auto-remove background in the operator's browser (using Transformers.js and MODNet).
 - Position subject on a pure white background.
 - Center and scale the subject.
 - Resize canvas to exact 600x800 pixels.
@@ -10,7 +10,7 @@ PECTAA Image Resizer is a production-ready, full-stack online web application bu
 
 ## Tech Stack
 - **Frontend**: React, Vite, Tailwind CSS v3, `react-easy-crop`
-- **Backend**: FastAPI (Python), `rembg`, `pillow`, `sqlite3`
+- **Backend**: FastAPI for sessions, quotas, and records; Supabase PostgreSQL in production
 - **Database**: SQLite (for session tracking)
 
 ---
@@ -63,29 +63,25 @@ PECTAA Image Resizer is a production-ready, full-stack online web application bu
 
 ## Running Automated Tests
 
-To test the image processing, centering, and compression size limits (11KB-24KB) locally:
-1. Ensure your backend virtual environment is active.
-2. Run the test script:
-   ```bash
-   python backend/test_image_processor.py
-   ```
+Run the frontend production checks:
+
+```bash
+cd frontend
+npm run lint
+npm run build
+```
+
+For an end-to-end check, start the app, process one normal JPG in Chrome or Edge, confirm the downloaded image is 600x800 and 11-24 KB, then verify the admin count increased.
 
 ---
 
-## Image Processing Speed Settings
+## Browser Image Processing
 
-The app is optimized to reduce generation time:
-- The cropper uploads each crop as a final 600x800 JPEG, reducing network transfer and backend AI workload.
-- The backend reuses one cached `rembg` model session instead of loading it repeatedly.
-- JPEG compression uses a faster quality search instead of a long quality sweep.
-- `PRELOAD_REMBG_MODEL=1` loads the model during server startup so the first user request is faster. Use `0` on Render Free so the health check can complete before the model is loaded.
-- `PROCESS_MAX_DIM=960` limits oversized images before background removal. Increase it only if you need slightly sharper edge detail at the cost of slower processing.
+Background removal, 600x800 composition, JPEG compression, and ZIP generation now run in the operator's browser. The image itself is not uploaded to Render, so the Render Free 512 MB instance does not load `rembg` or ONNX at all.
 
-### Render Free Memory Profile
+The first image on a browser downloads and caches the MODNet model. Keep the crop screen open until it has finished preparing; later batches on the same browser are faster. Chrome and Edge on a normal desktop/laptop are the supported operator browsers. The backend receives only the result name and size so quotas, Supabase records, and the private admin panel remain accurate.
 
-The Render Blueprint uses `REMBG_MODEL=u2netp` and `PRELOAD_REMBG_MODEL=0`. `u2netp` is rembg's lightweight U2Net variant, which gives the 512 MB free instance the best chance of completing a request. Do not preload any rembg model on this free instance: the startup preload exceeded its memory limit. The frontend starts a safe warm-up after the backend is live, and the backend shares that single model load with processing requests.
-
-This is a cost-saving fallback, not a capacity guarantee. Render Free spins down after 15 minutes without traffic and takes about a minute to wake up, so it cannot be kept permanently live. Use a paid Render web service for an always-on production backend. If one real image still causes an out-of-memory restart, keep the code as-is and move the backend to an instance with more memory before accepting production traffic.
+Render Free can still sleep after inactivity, so login or quota recording may take a moment after 15 minutes of no traffic. This no longer affects the actual image background-removal workload and cannot cause the previous 512 MB model out-of-memory failure.
 
 ---
 
@@ -131,7 +127,7 @@ If you create the backend manually instead of using the Blueprint, use these set
 
 If Render logs show `Running build command 'yarn'` or `Running 'gunicorn --bind 0.0.0.0:$PORT wsgi:app'`, the service is using the wrong settings. Change it to the Python settings above, then redeploy.
 
-If Render logs show `No onnxruntime backend found`, make sure the latest code is deployed. The backend uses `rembg[cpu]` so `onnxruntime` is installed for background removal.
+The backend no longer installs `rembg` or ONNX. If an old browser build calls `/api/process-images`, refresh the frontend so it uses the browser processing workflow.
 
 The repository also includes a root `wsgi.py` compatibility entry so Render's default `gunicorn --bind 0.0.0.0:$PORT wsgi:app` command can boot the FastAPI app. The `uvicorn` start command above is still recommended.
 
@@ -169,7 +165,7 @@ For Vercel, deploy the **frontend**:
 
 Vercel hosts only the frontend. Login, school records, image processing, and dashboard activity require the FastAPI backend to be live and connected through `VITE_API_URL`.
 
-The FastAPI backend is better hosted on Render, Railway, Fly.io, or another Python web-service host. Vercel serverless functions are not ideal for this backend because `rembg`/ONNX model loading is large, cold starts can be slow, and processed image files are temporary.
+The FastAPI backend can run on a small Render service because it only manages sessions, quotas, feedback, and Supabase records. Image processing is intentionally client-side to avoid server CPU and memory charges.
 
 ### Optional Vercel Backend Settings
 

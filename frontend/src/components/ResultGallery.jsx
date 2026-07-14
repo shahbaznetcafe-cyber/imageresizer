@@ -88,7 +88,7 @@ export default function ResultGallery({ results = [], failedImages = [], zipUrl,
 
   const getAssetUrl = (url) => {
     if (!url) return '';
-    if (/^data:/i.test(url)) return url;
+    if (/^(data:|blob:)/i.test(url)) return url;
     return getApiUrl(url);
   };
 

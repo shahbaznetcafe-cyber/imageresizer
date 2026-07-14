@@ -7,7 +7,8 @@ PECTAA Image Resizer is a full-stack web app for school/computer operators. It r
 ## Stack
 
 - Frontend: React, Vite, Tailwind CSS, `react-easy-crop`
-- Backend: FastAPI, Pillow, rembg, SQLite by default, optional PostgreSQL/Supabase through `DATABASE_URL`
+- Backend: FastAPI for sessions/quotas/records, SQLite by default, optional PostgreSQL/Supabase through `DATABASE_URL`
+- Image processing: browser-side Transformers.js MODNet, canvas JPEG output, and browser ZIP generation
 - Deployment notes: Render blueprint for backend plus static frontend; optional Vercel frontend/backend config exists
 
 ## Important Paths
@@ -31,4 +32,3 @@ As of 2026-07-09 13:43:12 +05:00:
 - Git warning observed: unable to access `C:\Users\shahbaz/.config/git/ignore` due to permission denied
 
 Do not discard the existing modified/untracked work without user approval.
-

@@ -12,6 +12,12 @@ import FeedbackDialog from './components/FeedbackDialog';
 import LimitRequestForm from './components/LimitRequestForm';
 import { getApiErrorMessage, getNetworkErrorMessage } from './utils/apiErrors';
 import { getApiUrl } from './utils/api';
+import {
+  blobToDataUrl,
+  prepareClientBackgroundRemoval,
+  processImageInBrowser,
+} from './utils/clientImageProcessor';
+import JSZip from 'jszip';
 
 const SESSION_CACHE_KEY = 'pectaa-session-cache-v2';
 const SESSION_CACHE_MS = 12 * 60 * 60 * 1000;
@@ -103,15 +109,6 @@ async function fetchWithRetry(url, options, config = {}) {
   throw lastError || new Error('Request failed. Please try again.');
 }
 
-function warmBackendProcessor() {
-  fetch(getApiUrl('/api/warmup'), {
-    method: 'POST',
-    keepalive: true,
-  }).catch(() => {
-    // Warmup is only a speed boost; the main workflow can continue without it.
-  });
-}
-
 export default function App() {
   const [step, setStep] = useState('login'); // 'login', 'upload', 'crop', 'processing', 'result'
   const [session, setSession] = useState(null);
@@ -126,18 +123,12 @@ export default function App() {
   const [showLimitRequest, setShowLimitRequest] = useState(false);
 
   useEffect(() => {
-    // Start the model while the operator enters login details instead of delaying the first image.
-    warmBackendProcessor();
-  }, []);
-
-  useEffect(() => {
     let isMounted = true;
 
     const cachedSession = loadCachedSession();
     if (cachedSession) {
       setSession(cachedSession);
       setStep('upload');
-      warmBackendProcessor();
       return () => {
         isMounted = false;
       };
@@ -175,7 +166,6 @@ export default function App() {
         setSession(sessionData);
         setQuotaRestriction(null);
         storeCachedSession(sessionData);
-        warmBackendProcessor();
         setStep('upload');
       } catch (err) {
         if (!isMounted) return;
@@ -196,13 +186,16 @@ export default function App() {
     setSession(sessionData);
     setQuotaRestriction(null);
     storeCachedSession(sessionData);
-    warmBackendProcessor();
     setStep('upload');
   };
 
   const handleFilesSelected = (files) => {
     setUploadedFiles(files);
     setStep('crop');
+    // Download/load the browser model while the operator is choosing crops.
+    prepareClientBackgroundRemoval().catch((error) => {
+      console.warn('Browser background removal preparation failed.', error);
+    });
   };
 
   const handleCroppingDone = async (croppedList) => {
@@ -210,24 +203,55 @@ export default function App() {
     setStep('processing');
     setError(null);
 
-    // Prepare files to send to FastAPI
-    const formData = new FormData();
-    formData.append('session_id', session.id);
-    croppedList.forEach((item) => {
-      // Append each cropped file
-      formData.append('files', item.file, item.originalName);
-    });
-
     try {
+      const clientResults = [];
+      const clientFailures = [];
+
+      for (const item of croppedList) {
+        try {
+          const outputBlob = await processImageInBrowser(item.file);
+          const outputName = `${item.originalName.replace(/\.[^.]+$/, '') || 'processed'}.jpg`;
+          clientResults.push({
+            original_name: item.originalName,
+            processed_name: outputName,
+            data_url: await blobToDataUrl(outputBlob),
+            output_blob: outputBlob,
+            size_kb: Number((outputBlob.size / 1024).toFixed(2)),
+          });
+        } catch (imageError) {
+          console.error('Browser image processing failed.', imageError);
+          clientFailures.push({
+            original_name: item.originalName,
+            reason: imageError?.message || 'This image could not be processed in this browser.',
+          });
+        }
+      }
+
+      if (!clientResults.length) {
+        setResults([]);
+        setFailedImages(clientFailures);
+        setZipUrl(null);
+        setStep('result');
+        return;
+      }
+
+      const recordFormData = new FormData();
+      recordFormData.append('session_id', session.id);
+      recordFormData.append('processed_images_json', JSON.stringify(clientResults.map((image) => ({
+        original_name: image.original_name,
+        processed_name: image.processed_name,
+        size_kb: image.size_kb,
+      }))));
+
       const response = await fetchWithRetry(
-        getApiUrl('/api/process-images'),
+        getApiUrl('/api/record-processed-images'),
         {
           method: 'POST',
-          body: formData,
+          body: recordFormData,
         },
         {
           retries: 1,
-          timeoutMs: 180000,
+          timeoutMs: 30000,
         }
       );
 
@@ -258,9 +282,16 @@ export default function App() {
       }
 
       const data = await response.json();
-      setResults(data.images || []);
-      setFailedImages(data.failed_images || []);
-      setZipUrl(data.zip_data_url || data.zip_url);
+      let nextZipUrl = null;
+      if (clientResults.length > 1) {
+        const zip = new JSZip();
+        clientResults.forEach((image) => zip.file(image.processed_name, image.output_blob));
+        nextZipUrl = URL.createObjectURL(await zip.generateAsync({ type: 'blob' }));
+      }
+
+      setResults(clientResults);
+      setFailedImages(clientFailures);
+      setZipUrl(nextZipUrl);
       
       // Update local session processed count
       setSession(prev => {
@@ -295,6 +326,7 @@ export default function App() {
     // Revoke any Object URLs to free memory
     croppedFiles.forEach(f => URL.revokeObjectURL(f.previewUrl));
     uploadedFiles.forEach(f => URL.revokeObjectURL(f.previewUrl));
+    if (zipUrl?.startsWith('blob:')) URL.revokeObjectURL(zipUrl);
     
     setUploadedFiles([]);
     setCroppedFiles([]);

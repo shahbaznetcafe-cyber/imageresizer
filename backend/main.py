@@ -1,16 +1,9 @@
-import base64
 import os
-import tempfile
-import uuid
-import zipfile
 from typing import List
 from datetime import datetime, timedelta
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from starlette.concurrency import run_in_threadpool
 
-# Import database and image processor modules.
 # The fallback keeps local `uvicorn main:app` usage working from the backend folder.
 try:
     from .database import (
@@ -32,7 +25,6 @@ try:
         DATABASE_BACKEND,
         DISABLE_USAGE_LIMITS,
     )
-    from .image_processor import process_single_image, warm_image_processor
 except ImportError:
     from database import (
         init_db,
@@ -53,7 +45,6 @@ except ImportError:
         DATABASE_BACKEND,
         DISABLE_USAGE_LIMITS,
     )
-    from image_processor import process_single_image, warm_image_processor
 
 # Initialize FastAPI application
 app = FastAPI(title="PECTAA Image Resizer API")
@@ -76,45 +67,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ensure processed files directory exists. Vercel's code directory is read-only,
-# so temporary processed files must live under /tmp there.
-PROCESSED_DIR = os.getenv(
-    "PROCESSED_DIR",
-    os.path.join(tempfile.gettempdir(), "processed_temp")
-    if os.getenv("VERCEL")
-    else os.path.join(os.path.dirname(os.path.abspath(__file__)), "processed_temp")
-)
-os.makedirs(PROCESSED_DIR, exist_ok=True)
-
-# Mount static files to serve processed images
-app.mount("/processed", StaticFiles(directory=PROCESSED_DIR), name="processed")
-
 # Initialize database on startup
 @app.on_event("startup")
 def startup_event():
     init_db()
-    default_preload = "0" if os.getenv("VERCEL") else "1"
-    if os.getenv("PRELOAD_REMBG_MODEL", default_preload).lower() in {"1", "true", "yes", "on"}:
-        try:
-            warm_image_processor()
-        except Exception as e:
-            print(f"Background-removal model preload failed: {e}")
-
-# Helper function to delete old files after the session window.
-def cleanup_old_files():
-    """Removes files in PROCESSED_DIR that are older than the session window."""
-    now = datetime.now()
-    threshold = now - timedelta(hours=SESSION_TTL_HOURS)
-    
-    for filename in os.listdir(PROCESSED_DIR):
-        file_path = os.path.join(PROCESSED_DIR, filename)
-        if os.path.isfile(file_path):
-            file_mtime = datetime.fromtimestamp(os.path.getmtime(file_path))
-            if file_mtime < threshold:
-                try:
-                    os.remove(file_path)
-                except Exception as e:
-                    print(f"Error deleting file {file_path}: {e}")
 
 @app.get("/api/health")
 @app.get("/health")  # alias for compatibility
@@ -126,13 +82,6 @@ def health_check():
         "database": "connected",
         "database_backend": DATABASE_BACKEND
     }
-
-
-@app.post("/api/warmup")
-def api_warmup(background_tasks: BackgroundTasks):
-    """Starts model loading early so image processing is faster after login."""
-    background_tasks.add_task(warm_image_processor)
-    return {"status": "warming"}
 
 
 def is_session_expired(session: dict) -> bool:
@@ -525,6 +474,12 @@ async def api_process_images(
     If multiple files are uploaded, a ZIP is also created.
     Updates the session's processed count.
     """
+    raise HTTPException(
+        status_code=410,
+        detail="Server-side image processing has moved to the browser. Please refresh the application.",
+    )
+
+    # Legacy implementation retained temporarily for rollback history only.
     # 1. Validate Session ID
     session = get_session(session_id)
     if not session or is_session_expired(session):
@@ -729,5 +684,63 @@ async def api_process_images(
         "zip_url": zip_url,
         "zip_data_url": zip_data_url,
         "activity": get_activity_summary()
+    }
+
+
+@app.post("/api/record-processed-images")
+def api_record_processed_images(
+    session_id: int = Form(...),
+    processed_images_json: str = Form(...),
+):
+    """Records browser-processed images without running AI inference on the server."""
+    session = get_session(session_id)
+    if not session or is_session_expired(session):
+        raise HTTPException(status_code=404, detail="Session expired. Please log in again.")
+
+    try:
+        import json
+        processed_images = json.loads(processed_images_json)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid processed image metadata.")
+
+    if not isinstance(processed_images, list) or not processed_images or len(processed_images) > 10:
+        raise HTTPException(status_code=400, detail="You must record between 1 and 10 images.")
+
+    clean_images = []
+    for image in processed_images:
+        if not isinstance(image, dict):
+            raise HTTPException(status_code=400, detail="Invalid processed image metadata.")
+        original_name = os.path.basename(str(image.get("original_name") or "image.jpg"))[:180]
+        processed_name = os.path.basename(str(image.get("processed_name") or "processed.jpg"))[:180]
+        size_kb = float(image.get("size_kb") or 0)
+        if not original_name or size_kb <= 0 or size_kb > 100:
+            raise HTTPException(status_code=400, detail="Invalid processed image metadata.")
+        clean_images.append({
+            "original_name": original_name,
+            "processed_name": processed_name,
+            "url": "",
+            "size_kb": round(size_kb, 2),
+        })
+
+    quota_check = check_device_quota(session, len(clean_images))
+    if not quota_check["allowed"]:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": quota_check["reason"],
+                "en": quota_check["message"],
+                "ur": quota_check["message"],
+                "quota": quota_check["quota"],
+            },
+        )
+
+    record_processed_images(session, clean_images)
+    new_count = update_processed_count(session_id, len(clean_images))
+    quota = add_device_usage(session.get("device_limit_id"), len(clean_images))
+    return {
+        "success": True,
+        "processed_count": len(clean_images),
+        "total_session_count": new_count,
+        "quota": quota,
     }
 

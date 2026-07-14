@@ -2,7 +2,7 @@
 
 ## Current Goal
 
-Move the complete app from paused Vercel hosting to Render while retaining the Supabase PostgreSQL database.
+Run the app reliably on Render Free while retaining Supabase PostgreSQL, without server-side AI image processing.
 
 ## Completed Subtasks
 
@@ -65,3 +65,12 @@ Move the complete app from paused Vercel hosting to Render while retaining the S
    - `python -m compileall backend`
 7. Open the admin panel and verify the compact scroll sections with real production-like data.
 8. The next recovery step is to verify the restored on-demand model deploy, then process one real image while watching the logs for memory errors.
+
+## Latest Checkpoint: Browser Processing
+
+- Browser-side MODNet background removal, 600x800 JPEG generation, and ZIP downloads are implemented.
+- The FastAPI backend records completed-image counts through `/api/record-processed-images`; the live frontend no longer asks Render to run AI inference.
+- `render.yaml` and `backend/requirements.txt` no longer request rembg/ONNX dependencies, preventing the Render Free 512 MB model crash.
+- Frontend lint and production build passed. Local Python checks remain blocked because Python is not installed in this workspace.
+
+Next recovery action: push this checkpoint, let Render rebuild both services, then process one normal JPG in Chrome/Edge and confirm the admin count increases.

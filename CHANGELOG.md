@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-07-15 +05:00
+
+### What Changed
+
+- Moved background removal, white-background 600x800 composition, JPEG size fitting, and ZIP creation from the Render backend into the operator's browser.
+- Added a quota-protected backend endpoint that records browser-completed images in Supabase/admin records without receiving image files.
+- Removed rembg/ONNX deployment dependencies and model environment variables from the Render Free configuration.
+
+### Files Changed
+
+- `frontend/src/App.jsx`, `frontend/src/utils/clientImageProcessor.js`, and frontend processing UI components
+- `frontend/package.json`, `frontend/package-lock.json`
+- `backend/main.py`, `backend/requirements.txt`, `render.yaml`
+- `README.md`, `PROJECT.md`, `CURRENT_TASK.md`, `NEXT_STEPS.md`, `CHANGELOG.md`
+
+### Why It Changed
+
+- Render Free terminated the service when rembg/ONNX exceeded its 512 MB memory limit. Browser processing removes that workload while retaining Supabase sessions, quotas, and admin records.
+
+### Risks Or Pending Work
+
+- The first use on each browser downloads the MODNet model and needs a modern Chrome or Edge browser; later runs use the browser cache.
+- Render Free may still sleep after inactivity, so session/quota requests can wake slowly, but image processing itself no longer waits for or loads a Render model.
+- The existing user modification in `backend/database.py` and Personal Unlimited export files remain untouched.
+
+### Verification
+
+- Passed: `npm.cmd run lint`
+- Passed: `npm.cmd run build`
+- Passed: `git diff --check`
+- Blocked: backend Python compile/test because Python is not installed in this workspace.
+
 ## 2026-07-09 13:43:12 +05:00
 
 ### What Changed
