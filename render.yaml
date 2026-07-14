@@ -1,13 +1,19 @@
 services:
-  # 1. FastAPI Python Backend Web Service
+  # FastAPI image-processing API backed by Supabase PostgreSQL.
   - type: web
     name: sed-punjab-resizer-backend
     runtime: python
+    plan: free
     buildCommand: "pip install -r backend/requirements.txt"
     startCommand: "python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
-        value: school_sessions.db
+        sync: false
+      - key: ADMIN_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        value: "*"
       - key: U2NET_HOME
         value: /opt/render/project/src/backend/model_cache
       - key: PRELOAD_REMBG_MODEL
@@ -21,21 +27,16 @@ services:
       - key: PYTHON_VERSION
         value: 3.10.12
 
-  # 2. React Static Frontend Service
+  # React frontend. This replaces the paused Vercel deployment.
   - type: web
     name: sed-punjab-resizer-frontend
     runtime: static
-    buildCommand: "cd frontend && npm install && npm run build"
-    publishPath: "frontend/dist"
-    headers:
-      - key: Cache-Control
-        value: "public, max-age=31536000, immutable"
+    buildCommand: "cd frontend && npm ci && npm run build"
+    publishPath: frontend/dist
     routes:
-      # Rewrite all non-file paths to index.html for React Router / SPA
       - type: rewrite
-        source: "/*"
-        destination: "/index.html"
+        source: /*
+        destination: /index.html
     envVars:
       - key: VITE_API_URL
-        # Set this to the URL of the backend web service on Render
         value: https://sed-punjab-resizer-backend.onrender.com

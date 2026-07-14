@@ -2,7 +2,7 @@
 
 ## Current Goal
 
-Improve the admin panel so long record tables/lists stay usable and do not make the page excessively long.
+Move the complete app from paused Vercel hosting to Render while retaining the Supabase PostgreSQL database.
 
 ## Completed Subtasks
 
@@ -13,6 +13,8 @@ Improve the admin panel so long record tables/lists stay usable and do not make 
 - Ran frontend checks successfully: `npm.cmd run build` and `npm.cmd run lint`.
 - Compact admin records layout added for long tables/lists.
 - Re-ran frontend checks successfully after the admin panel change.
+- Confirmed the Vercel account was paused after Fluid Active CPU exceeded its allowance; the image-processing API should not run on Vercel.
+- Prepared a Render Blueprint for both the image-processing backend and static frontend.
 
 ## Remaining Subtasks
 
@@ -21,6 +23,8 @@ Improve the admin panel so long record tables/lists stay usable and do not make 
 - Decide whether the untracked Personal Unlimited export should be committed, ignored, or archived outside source control.
 - Verify backend import/compile or tests still pass.
 - Visually check the live admin panel after deploy/local run with real admin records.
+- Create the Render services from the pushed Blueprint and enter the Supabase/administrator secrets.
+- Add `pectaa.shahbaznetcafe.com` to the Render frontend service and update its DNS record after the frontend is live.
 
 ## Important Files Involved
 
@@ -35,14 +39,18 @@ Improve the admin panel so long record tables/lists stay usable and do not make 
 - `backend/image_processor.py`
 - `frontend/src/App.jsx`
 - `frontend/src/components/AdminRecords.jsx`
+- `render.yaml`
+- `.env.example`
 - `start-personal-unlimited.bat`
 
 ## Recovery Instructions For Next Codex Session
 
 1. Read `AGENTS.md`, `PROJECT.md`, `CURRENT_TASK.md`, `CHANGELOG.md`, and `NEXT_STEPS.md`.
 2. Run `git status --short --branch`.
-3. Frontend checks passed in this checkpoint. Backend Python checks are still pending because `python` was not found and the Python launcher reported no installed Python.
-4. When Python is available, run:
+3. Render must receive a Supabase Session pooler URL through `DATABASE_URL`, not a SQLite filename. Add `ADMIN_KEY` as a Render secret.
+4. The Blueprint deploys the frontend with its Render backend URL. Add the custom domain and update DNS after both services are live.
+5. Frontend checks passed in this checkpoint. Backend Python checks are still pending because `python` was not found and the Python launcher reported no installed Python.
+6. When Python is available, run:
    - `python -m compileall backend`
-5. Open the admin panel and verify the compact scroll sections with real production-like data.
-6. Continue with the first pending item in `NEXT_STEPS.md`.
+7. Open the admin panel and verify the compact scroll sections with real production-like data.
+8. Continue with the first pending item in `NEXT_STEPS.md`.

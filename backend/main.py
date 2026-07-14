@@ -60,19 +60,18 @@ app = FastAPI(title="PECTAA Image Resizer API")
 SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "12"))
 ADMIN_KEY = os.getenv("ADMIN_KEY", "")
 
-# Configure CORS
+# Configure CORS. Production origins are supplied by the host so the API can
+# remain separate from the Vercel frontend without exposing browser credentials.
 origins = [
-    "http://localhost:5173",  # React dev server
-    "http://127.0.0.1:5173",
-    "https://shahbaznetcafe.com",
-    "https://www.shahbaznetcafe.com",
-    "https://sed-punjab-photo-resizer.onrender.com"  # Render domain placeholder
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "").split(",")
+    if origin.strip()
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all for API accessibility, can restrict in production
-    allow_credentials=True,
+    allow_origins=origins or ["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -67,3 +67,42 @@
 
 - Passed: `npm.cmd run lint`
 - Passed: `npm.cmd run build`
+
+## 2026-07-14 +05:00
+
+### What Changed
+
+- Prepared a full Render Blueprint so both the CPU-intensive image processor and paused frontend can move off Vercel.
+- Changed the Blueprint to request the Supabase PostgreSQL URL, admin key, and browser-origin list as Render secrets instead of forcing a local SQLite database.
+- Added a Render health check and documented the exact Supabase Session pooler, Render, and Vercel handover steps.
+- Made API CORS origins configurable through `CORS_ORIGINS`; requests do not use browser credentials.
+
+### Files Changed
+
+- `backend/main.py`
+- `render.yaml`
+- `.env.example`
+- `README.md`
+- `CURRENT_TASK.md`
+- `CHANGELOG.md`
+- `NEXT_STEPS.md`
+
+### Why It Changed
+
+- Vercel paused the account after the image-processing API exceeded the Fluid Active CPU allowance.
+- The application already supports Supabase PostgreSQL, but the Render Blueprint incorrectly forced SQLite. Vercel is paused, so the frontend must move to Render too.
+
+### Risks Or Pending Work
+
+- A Render account/dashboard action is still required to create the service and enter secrets; no database credentials were added to the repository.
+- Render free instances can sleep and may be too small for sustained `rembg` image-processing traffic.
+- The custom domain must be switched to the Render static frontend service after deploy; this still requires a DNS dashboard change.
+- The existing user modification in `backend/database.py` remains untouched.
+
+### Verification
+
+- Pending: Render Blueprint validation, because Render CLI/MCP access is not available in this workspace.
+- Pending: backend compile/test, because no usable local Python installation is available.
+- Passed: `npm.cmd run lint`.
+- Blocked: `npm.cmd run build` because Windows denied Vite access to the generated `frontend/dist/assets` directory. This is an existing output-folder lock, not a source compilation error.
+- Passed: a clean Vite production build using a temporary output directory.

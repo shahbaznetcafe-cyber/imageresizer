@@ -9,16 +9,22 @@
 - Frontend lint passed.
 - Admin records page compacted with scrollable long sections.
 - Frontend lint/build passed after admin UI changes.
+- Identified Vercel Fluid Active CPU overuse as the production outage cause.
+- Prepared a full Render Blueprint that uses Supabase PostgreSQL through an environment secret and replaces the paused Vercel frontend.
 
 ## Do Next
 
-1. Open the admin panel and visually confirm long school records, feedback, and limit request sections are easier to use.
-2. Install/restore Python or activate a usable project virtual environment.
-3. Run the safest backend check:
+1. Commit and push the full Render deployment configuration.
+2. In Render, create the services from the Blueprint and enter `DATABASE_URL` and `ADMIN_KEY`.
+3. Confirm `https://<render-service>/api/health` returns `database_backend: "supabase_postgres"`.
+4. Add `pectaa.shahbaznetcafe.com` to the Render frontend Custom Domains screen and apply the DNS record it gives you.
+5. Open the admin panel and visually confirm long school records, feedback, and limit request sections are easier to use.
+6. Install/restore Python or activate a usable project virtual environment.
+7. Run the safest backend check:
    - `python -m compileall backend`
-4. Inspect any check failures and fix only issues related to the current work.
-5. Review the existing `backend/database.py` modification and decide whether it should be kept as user work, committed, or adjusted.
-6. Decide what to do with the untracked Personal Unlimited package/export files.
+8. Inspect any check failures and fix only issues related to the current work.
+9. Review the existing `backend/database.py` modification and decide whether it should be kept as user work, committed, or adjusted.
+10. Decide what to do with the untracked Personal Unlimited package/export files.
 
 ## Known Bugs / Risks
 
@@ -26,6 +32,8 @@
 - `backend/database.py` is marked modified, but this checkpoint did not change it.
 - `personal_school_sessions.db` is untracked; database files are usually not committed unless intentionally required.
 - The exported `PECTAA-Personal-Unlimited-NoLogin-20260703-150515/` folder duplicates much of the project and may not belong in source control.
+- Render free services can sleep; the first request after inactivity may be slow. Supabase direct database URLs may fail from Render if the Supabase project has no IPv4 add-on, so use the Supabase Session pooler URL.
+- The custom domain will remain unavailable until its DNS record is changed from Vercel to the Render static frontend service.
 
 ## Commands To Run Next
 
@@ -44,6 +52,6 @@ npm.cmd run lint
 ## Suggested Commit Message
 
 ```bash
-git add AGENTS.md PROJECT.md CURRENT_TASK.md CHANGELOG.md NEXT_STEPS.md frontend/src/components/AdminRecords.jsx
-git commit -m "checkpoint: compact admin records panel"
+git add backend/main.py render.yaml .env.example README.md CURRENT_TASK.md CHANGELOG.md NEXT_STEPS.md
+git commit -m "checkpoint: prepare Render backend deployment"
 ```

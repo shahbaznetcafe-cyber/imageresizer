@@ -99,17 +99,19 @@ The records page can export CSV with EMIS code, phone number, session date, and 
 
 ## Deployment to Render
 
-This repository is equipped with a `render.yaml` blueprint file for easy, unified deployment.
+This repository is equipped with a `render.yaml` blueprint for both the FastAPI backend and React frontend. It replaces the paused Vercel deployment so image processing does not consume Vercel Fluid Active CPU.
 
-1. Connect your GitHub repository to Render.
+1. Push the latest `main` branch to GitHub, then connect the repository to Render.
 2. Click **New** → **Blueprint** on your Render Dashboard.
-3. Select your repository. Render will automatically detect the `render.yaml` configuration and set up:
-   - A static site for the React frontend.
-   - A Python web service for the FastAPI backend.
-4. **Update Frontend Environment Variable**:
-   - Once the backend service is deployed, copy its URL (e.g., `https://sed-punjab-resizer-backend.onrender.com`).
-   - Go to your Frontend service settings in Render, add the environment variable `VITE_API_URL` and set its value to your backend's URL.
-   - Re-deploy the frontend service.
+3. Select the repository. Render will detect `render.yaml` and create the Python backend service plus a static frontend service.
+4. During Blueprint setup, provide these secrets. Do not put them in Git:
+   - `DATABASE_URL`: the Supabase Session pooler PostgreSQL connection string from Supabase Dashboard Connect. Render is an IPv4 service, so do not use a Supabase direct connection unless your Supabase project has IPv4 enabled.
+   - `ADMIN_KEY`: the same strong private value used for the admin records screen.
+5. Wait for the Render service to become live, then open `https://your-render-service.onrender.com/api/health`. It should return `database_backend: "supabase_postgres"`.
+6. Open the Render frontend URL and check that login and image processing work. The frontend is configured to call the Render backend automatically.
+7. In the Render frontend service, add `pectaa.shahbaznetcafe.com` under **Custom Domains**. Update the domain DNS record to the Render value shown in that screen.
+
+The Render free plan can sleep after inactivity, so the first image request after a quiet period may take longer. It is suitable for testing; use a paid Render instance before relying on it for busy school traffic.
 
 ### Manual Render Backend Settings
 
