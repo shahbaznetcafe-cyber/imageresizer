@@ -15,6 +15,7 @@ Move the complete app from paused Vercel hosting to Render while retaining the S
 - Re-ran frontend checks successfully after the admin panel change.
 - Confirmed the Vercel account was paused after Fluid Active CPU exceeded its allowance; the image-processing API should not run on Vercel.
 - Prepared a Render Blueprint for both the image-processing backend and static frontend.
+- Corrected the Render static-site publish setting after the Blueprint dashboard reported a validation issue.
 
 ## Remaining Subtasks
 

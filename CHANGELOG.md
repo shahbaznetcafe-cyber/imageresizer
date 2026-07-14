@@ -76,6 +76,7 @@
 - Changed the Blueprint to request the Supabase PostgreSQL URL, admin key, and browser-origin list as Render secrets instead of forcing a local SQLite database.
 - Added a Render health check and documented the exact Supabase Session pooler, Render, and Vercel handover steps.
 - Made API CORS origins configurable through `CORS_ORIGINS`; requests do not use browser credentials.
+- Corrected the Render static-site publish field to `staticPublishPath` after the Blueprint dashboard reported a validation issue.
 
 ### Files Changed
 

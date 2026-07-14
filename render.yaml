@@ -32,7 +32,7 @@ services:
     name: sed-punjab-resizer-frontend
     runtime: static
     buildCommand: "cd frontend && npm ci && npm run build"
-    publishPath: frontend/dist
+    staticPublishPath: frontend/dist
     routes:
       - type: rewrite
         source: /*

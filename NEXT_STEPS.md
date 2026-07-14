@@ -11,6 +11,7 @@
 - Frontend lint/build passed after admin UI changes.
 - Identified Vercel Fluid Active CPU overuse as the production outage cause.
 - Prepared a full Render Blueprint that uses Supabase PostgreSQL through an environment secret and replaces the paused Vercel frontend.
+- Corrected the static frontend Blueprint field required by Render validation.
 
 ## Do Next
 
