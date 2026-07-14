@@ -19,6 +19,9 @@ Move the complete app from paused Vercel hosting to Render while retaining the S
 - Diagnosed the first Render build failure: `rembg>=2.0.76` requires Python 3.11+, while the Blueprint selected Python 3.10.12.
 - Confirmed the Blueprint now requests Python 3.11.11, but the existing Render service has a dashboard-saved `PYTHON_VERSION=3.10.12` that overrides it.
 - Confirmed the second Render backend startup failure is an invalid Supabase `DATABASE_URL`: a percent sign in the database password was not URL-encoded.
+- Confirmed the corrected Supabase URL gets through database initialization; the backend then failed only while loading the `u2net` model.
+- Diagnosed the current Render failure as a 512 MB free-instance out-of-memory restart caused by preloading the 176 MB `u2net` model before Uvicorn could bind its port.
+- Updated the Render Blueprint to defer model loading and use rembg's lightweight `u2netp` model for the free instance.
 
 ## Remaining Subtasks
 
@@ -27,11 +30,9 @@ Move the complete app from paused Vercel hosting to Render while retaining the S
 - Decide whether the untracked Personal Unlimited export should be committed, ignored, or archived outside source control.
 - Verify backend import/compile or tests still pass.
 - Visually check the live admin panel after deploy/local run with real admin records.
-- Create the Render services from the pushed Blueprint and enter the Supabase/administrator secrets.
 - Add `pectaa.shahbaznetcafe.com` to the Render frontend service and update its DNS record after the frontend is live.
-- Re-deploy the backend after the Python 3.11.11 Blueprint update and review the next Render build log.
-- In Render backend Environment settings, change the existing `PYTHON_VERSION` from `3.10.12` to `3.11.11`, then redeploy.
-- Replace Render `DATABASE_URL` with the exact Supabase Session pooler connection string. Any percent sign in the password must be encoded as `%25`.
+- Redeploy the backend from this lightweight-model checkpoint and confirm `/api/health` responds without an out-of-memory restart.
+- Process one representative school photo. If it still runs out of memory, do not keep retrying on the free plan; move the backend to a larger-memory service.
 
 ## Important Files Involved
 
@@ -54,10 +55,10 @@ Move the complete app from paused Vercel hosting to Render while retaining the S
 
 1. Read `AGENTS.md`, `PROJECT.md`, `CURRENT_TASK.md`, `CHANGELOG.md`, and `NEXT_STEPS.md`.
 2. Run `git status --short --branch`.
-3. Render must receive a Supabase Session pooler URL through `DATABASE_URL`, not a SQLite filename. Add `ADMIN_KEY` as a Render secret.
+3. Render must receive a Supabase Session pooler URL through `DATABASE_URL`, not a SQLite filename. The corrected URL already passed database initialization. Keep `ADMIN_KEY` as a Render secret.
 4. The Blueprint deploys the frontend with its Render backend URL. Add the custom domain and update DNS after both services are live.
 5. Frontend checks passed in this checkpoint. Backend Python checks are still pending because `python` was not found and the Python launcher reported no installed Python.
 6. When Python is available, run:
    - `python -m compileall backend`
 7. Open the admin panel and verify the compact scroll sections with real production-like data.
-8. Continue with the first pending item in `NEXT_STEPS.md`.
+8. The next recovery step is to verify a lightweight-model Render deploy, then process exactly one real image while watching the logs for memory errors.

@@ -14,21 +14,25 @@
 - Corrected the static frontend Blueprint field required by Render validation.
 - Corrected the Render Python runtime to 3.11.11 so the required `rembg` package can install.
 - Identified a dashboard-saved `PYTHON_VERSION=3.10.12` override that must be changed manually on the existing Render backend service.
-- Confirmed dependencies now install successfully; the remaining backend startup error is an invalid percent-encoded character in `DATABASE_URL`.
+- Confirmed dependencies install successfully with Python 3.11.
+- Confirmed the corrected Supabase `DATABASE_URL` passes database initialization.
+- Identified the remaining backend crash as a 512 MB memory limit: startup preloaded the 176 MB `u2net` model before the web server bound its port.
+- Updated the Blueprint for a Render Free memory profile: no model preload and rembg's lightweight `u2netp` model.
 
 ## Do Next
 
-1. Commit and push the full Render deployment configuration.
-2. In the Render backend service Environment screen, replace `DATABASE_URL` with a valid Supabase Session pooler URL. Encode any `%` in the password as `%25`.
-3. Confirm the backend starts, then verify `https://<render-service>/api/health` returns `database_backend: "supabase_postgres"`.
-4. Add `pectaa.shahbaznetcafe.com` to the Render frontend Custom Domains screen and apply the DNS record it gives you.
-5. Open the admin panel and visually confirm long school records, feedback, and limit request sections are easier to use.
-6. Install/restore Python or activate a usable project virtual environment.
-7. Run the safest backend check:
+1. Let Render deploy the latest pushed commit, or use **Manual Deploy** → **Deploy latest commit** for the backend.
+2. Confirm the backend starts and `https://sed-punjab-resizer-backend.onrender.com/api/health` returns `database_backend: "supabase_postgres"` without an out-of-memory log line.
+3. Process exactly one representative school photo and keep the Render logs open. The first request will be slower because it downloads/loads `u2netp` on demand.
+4. If that request still causes an out-of-memory restart, stop testing the free service and move only the backend to a larger-memory Render instance. Do not change Supabase.
+5. Add `pectaa.shahbaznetcafe.com` to the Render frontend Custom Domains screen and apply the DNS record it gives you after the image test passes.
+6. Open the admin panel and visually confirm long school records, feedback, and limit request sections are easier to use.
+7. Install/restore Python or activate a usable project virtual environment.
+8. Run the safest backend check:
    - `python -m compileall backend`
-8. Inspect any check failures and fix only issues related to the current work.
-9. Review the existing `backend/database.py` modification and decide whether it should be kept as user work, committed, or adjusted.
-10. Decide what to do with the untracked Personal Unlimited package/export files.
+9. Inspect any check failures and fix only issues related to the current work.
+10. Review the existing `backend/database.py` modification and decide whether it should be kept as user work, committed, or adjusted.
+11. Decide what to do with the untracked Personal Unlimited package/export files.
 
 ## Known Bugs / Risks
 
@@ -37,6 +41,7 @@
 - `personal_school_sessions.db` is untracked; database files are usually not committed unless intentionally required.
 - The exported `PECTAA-Personal-Unlimited-NoLogin-20260703-150515/` folder duplicates much of the project and may not belong in source control.
 - Render free services can sleep; the first request after inactivity may be slow. Supabase direct database URLs may fail from Render if the Supabase project has no IPv4 add-on, so use the Supabase Session pooler URL.
+- `u2netp` is a lower-memory model and may produce less precise background edges than `u2net`. The full `u2net` model cannot be reliably preloaded in this 512 MB free service.
 - The custom domain will remain unavailable until its DNS record is changed from Vercel to the Render static frontend service.
 
 ## Commands To Run Next
@@ -56,6 +61,6 @@ npm.cmd run lint
 ## Suggested Commit Message
 
 ```bash
-git add backend/main.py render.yaml .env.example README.md CURRENT_TASK.md CHANGELOG.md NEXT_STEPS.md
-git commit -m "checkpoint: prepare Render backend deployment"
+git add render.yaml README.md CURRENT_TASK.md CHANGELOG.md NEXT_STEPS.md
+git commit -m "checkpoint: fit Render backend within free memory"
 ```

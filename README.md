@@ -78,8 +78,14 @@ The app is optimized to reduce generation time:
 - The cropper uploads each crop as a final 600x800 JPEG, reducing network transfer and backend AI workload.
 - The backend reuses one cached `rembg` model session instead of loading it repeatedly.
 - JPEG compression uses a faster quality search instead of a long quality sweep.
-- `PRELOAD_REMBG_MODEL=1` loads the model during server startup so the first user request is faster.
+- `PRELOAD_REMBG_MODEL=1` loads the model during server startup so the first user request is faster. Use `0` on Render Free so the health check can complete before the model is loaded.
 - `PROCESS_MAX_DIM=960` limits oversized images before background removal. Increase it only if you need slightly sharper edge detail at the cost of slower processing.
+
+### Render Free Memory Profile
+
+The Render Blueprint deliberately uses `PRELOAD_REMBG_MODEL=0` and `REMBG_MODEL=u2netp`. `u2netp` is rembg's lightweight U2Net variant, which gives the 512 MB free instance the best chance of completing a request. The first image after a restart downloads/loads the model and is slower; edge quality may be lower than full `u2net`.
+
+This is a cost-saving fallback, not a capacity guarantee. If one real image still causes an out-of-memory restart, keep the code as-is and move the backend to an instance with more memory before accepting production traffic.
 
 ---
 
@@ -111,7 +117,7 @@ This repository is equipped with a `render.yaml` blueprint for both the FastAPI 
 6. Open the Render frontend URL and check that login and image processing work. The frontend is configured to call the Render backend automatically.
 7. In the Render frontend service, add `pectaa.shahbaznetcafe.com` under **Custom Domains**. Update the domain DNS record to the Render value shown in that screen.
 
-The Render free plan can sleep after inactivity, so the first image request after a quiet period may take longer. It is suitable for testing; use a paid Render instance before relying on it for busy school traffic.
+The Render free plan can sleep after inactivity, so the first image request after a quiet period may take longer. This Blueprint uses the lightweight model/profile required by the 512 MB free instance; use a paid Render instance before relying on it for busy school traffic.
 
 ### Manual Render Backend Settings
 

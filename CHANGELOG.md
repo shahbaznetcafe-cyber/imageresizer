@@ -112,3 +112,38 @@
 - Passed: `npm.cmd run lint`.
 - Blocked: `npm.cmd run build` because Windows denied Vite access to the generated `frontend/dist/assets` directory. This is an existing output-folder lock, not a source compilation error.
 - Passed: a clean Vite production build using a temporary output directory.
+
+## 2026-07-14 +05:00
+
+### What Changed
+
+- Updated the Render Free backend profile to defer rembg model loading until the first image request.
+- Switched the Render-only rembg model from full `u2net` to lightweight `u2netp`.
+- Recorded the verified Render failure sequence: Python dependencies installed, Supabase initialization passed, then the 176 MB model preload exceeded Render Free's 512 MB memory limit.
+
+### Files Changed
+
+- `render.yaml`
+- `README.md`
+- `CURRENT_TASK.md`
+- `CHANGELOG.md`
+- `NEXT_STEPS.md`
+
+### Why It Changed
+
+- Render killed the backend for exceeding 512 MB while loading `u2net` during startup, so Uvicorn never bound the health-check port.
+- The official rembg project identifies `u2netp` as a lightweight U2Net model. Deferring its load allows the backend health check to complete and reduces the free-instance memory requirement.
+
+### Risks Or Pending Work
+
+- The first image after a restart is slower because the model downloads/loads on demand.
+- `u2netp` can have less accurate background edges than full `u2net`.
+- A real image must still be tested. If it exhausts 512 MB, the free backend is not viable for this image-processing workload and needs more memory.
+- Existing user changes in `backend/database.py` and Personal Unlimited files remain untouched.
+
+### Verification
+
+- Confirmed from Render logs: Python 3.11 dependencies installed successfully.
+- Confirmed from Render logs: database initialization completed before model preload began.
+- Confirmed from Render logs: the process was terminated for using more than 512 MB while loading `u2net`.
+- Pending: Render deployment and one real image test with the lightweight profile.

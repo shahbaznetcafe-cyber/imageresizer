@@ -17,11 +17,11 @@ services:
       - key: U2NET_HOME
         value: /opt/render/project/src/backend/model_cache
       - key: PRELOAD_REMBG_MODEL
-        value: "1"
+        value: "0"
       - key: PROCESS_MAX_DIM
         value: "960"
       - key: REMBG_MODEL
-        value: u2net
+        value: u2netp
       - key: SUBJECT_MARGIN_PX
         value: "3"
       - key: PYTHON_VERSION
