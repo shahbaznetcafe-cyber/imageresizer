@@ -14,12 +14,13 @@
 - Corrected the static frontend Blueprint field required by Render validation.
 - Corrected the Render Python runtime to 3.11.11 so the required `rembg` package can install.
 - Identified a dashboard-saved `PYTHON_VERSION=3.10.12` override that must be changed manually on the existing Render backend service.
+- Confirmed dependencies now install successfully; the remaining backend startup error is an invalid percent-encoded character in `DATABASE_URL`.
 
 ## Do Next
 
 1. Commit and push the full Render deployment configuration.
-2. In the Render backend service Environment screen, change `PYTHON_VERSION` to `3.11.11`, save, and deploy the latest commit.
-3. Confirm the backend rebuild installs `rembg` successfully, then verify `https://<render-service>/api/health` returns `database_backend: "supabase_postgres"`.
+2. In the Render backend service Environment screen, replace `DATABASE_URL` with a valid Supabase Session pooler URL. Encode any `%` in the password as `%25`.
+3. Confirm the backend starts, then verify `https://<render-service>/api/health` returns `database_backend: "supabase_postgres"`.
 4. Add `pectaa.shahbaznetcafe.com` to the Render frontend Custom Domains screen and apply the DNS record it gives you.
 5. Open the admin panel and visually confirm long school records, feedback, and limit request sections are easier to use.
 6. Install/restore Python or activate a usable project virtual environment.

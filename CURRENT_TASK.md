@@ -18,6 +18,7 @@ Move the complete app from paused Vercel hosting to Render while retaining the S
 - Corrected the Render static-site publish setting after the Blueprint dashboard reported a validation issue.
 - Diagnosed the first Render build failure: `rembg>=2.0.76` requires Python 3.11+, while the Blueprint selected Python 3.10.12.
 - Confirmed the Blueprint now requests Python 3.11.11, but the existing Render service has a dashboard-saved `PYTHON_VERSION=3.10.12` that overrides it.
+- Confirmed the second Render backend startup failure is an invalid Supabase `DATABASE_URL`: a percent sign in the database password was not URL-encoded.
 
 ## Remaining Subtasks
 
@@ -30,6 +31,7 @@ Move the complete app from paused Vercel hosting to Render while retaining the S
 - Add `pectaa.shahbaznetcafe.com` to the Render frontend service and update its DNS record after the frontend is live.
 - Re-deploy the backend after the Python 3.11.11 Blueprint update and review the next Render build log.
 - In Render backend Environment settings, change the existing `PYTHON_VERSION` from `3.10.12` to `3.11.11`, then redeploy.
+- Replace Render `DATABASE_URL` with the exact Supabase Session pooler connection string. Any percent sign in the password must be encoded as `%25`.
 
 ## Important Files Involved
 
