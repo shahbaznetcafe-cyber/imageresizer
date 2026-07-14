@@ -212,3 +212,33 @@
 
 - Passed: public `/api/health` returned `status: healthy` and `database_backend: supabase_postgres` before this configuration change.
 - Pending: Render deploy log and one production image test with compact-model startup preload.
+
+## 2026-07-15 +05:00
+
+### What Changed
+
+- Reverted Render Free rembg startup preloading after the deployed instance failed with an out-of-memory error over 512 MB.
+- Kept the lightweight `u2netp` model and on-demand warm-up path so the FastAPI backend can become healthy before image inference uses memory.
+
+### Files Changed
+
+- `render.yaml`
+- `README.md`
+- `CURRENT_TASK.md`
+- `CHANGELOG.md`
+- `NEXT_STEPS.md`
+
+### Why It Changed
+
+- Render reported an instance failure caused by exceeding the 512 MB free-memory limit during startup preloading.
+- Restoring on-demand model loading returns the backend to a bootable state; the model-load delay cannot be removed reliably on this instance size.
+
+### Risks Or Pending Work
+
+- The first image after an idle restart remains slower on Render Free.
+- The production solution for fast first-image processing and an always-on backend is a higher-memory paid service; Supabase does not need to change.
+
+### Verification
+
+- Confirmed from Render: instance `94v47` failed for exceeding 512 MB during startup preload.
+- Pending: Render deploy and health check after the rollback.
