@@ -17,7 +17,7 @@ services:
       - key: U2NET_HOME
         value: /opt/render/project/src/backend/model_cache
       - key: PRELOAD_REMBG_MODEL
-        value: "0"
+        value: "1"
       - key: PROCESS_MAX_DIM
         value: "960"
       - key: REMBG_MODEL

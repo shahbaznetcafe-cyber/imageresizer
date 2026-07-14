@@ -182,3 +182,33 @@
 - Passed: clean Vite production build using `.render-verify-warmup` as a temporary output directory.
 - Blocked: local backend syntax check because this machine still has no usable Python runtime or project virtual environment.
 - Pending: one live Render image-processing test after deployment.
+
+## 2026-07-15 +05:00
+
+### What Changed
+
+- Set the Render Free profile to preload the compact `u2netp` model during backend startup.
+- Kept the full `u2net` model disabled because its 176 MB preload previously exceeded Render Free's 512 MB memory limit.
+
+### Files Changed
+
+- `render.yaml`
+- `README.md`
+- `CURRENT_TASK.md`
+- `CHANGELOG.md`
+- `NEXT_STEPS.md`
+
+### Why It Changed
+
+- Lazy loading made the first image request wait for model initialization even after the backend health check was already live.
+- `u2netp` is the selected compact model, so moving its initialization to startup removes that extra first-image delay while retaining the memory-constrained profile.
+
+### Risks Or Pending Work
+
+- The next backend deployment must prove that `u2netp` preloads within the 512 MB limit. If it does not, revert `PRELOAD_REMBG_MODEL` to `0` and use a paid backend for fast always-on processing.
+- Render Free still spins down after 15 idle minutes; this change only removes model-load time after startup, not the platform cold-start delay.
+
+### Verification
+
+- Passed: public `/api/health` returned `status: healthy` and `database_backend: supabase_postgres` before this configuration change.
+- Pending: Render deploy log and one production image test with compact-model startup preload.
