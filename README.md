@@ -83,9 +83,9 @@ The app is optimized to reduce generation time:
 
 ### Render Free Memory Profile
 
-The Render Blueprint deliberately uses `PRELOAD_REMBG_MODEL=0` and `REMBG_MODEL=u2netp`. `u2netp` is rembg's lightweight U2Net variant, which gives the 512 MB free instance the best chance of completing a request. The first image after a restart downloads/loads the model and is slower; edge quality may be lower than full `u2net`.
+The Render Blueprint deliberately uses `PRELOAD_REMBG_MODEL=0` and `REMBG_MODEL=u2netp`. `u2netp` is rembg's lightweight U2Net variant, which gives the 512 MB free instance the best chance of completing a request. The frontend now starts the safe background warm-up as soon as it opens, so the model normally loads while the operator enters login details. The backend shares that single load with processing requests instead of loading it twice.
 
-This is a cost-saving fallback, not a capacity guarantee. If one real image still causes an out-of-memory restart, keep the code as-is and move the backend to an instance with more memory before accepting production traffic.
+This is a cost-saving fallback, not a capacity guarantee. Render Free spins down after 15 minutes without traffic and takes about a minute to wake up, so it cannot be kept permanently live. Use a paid Render web service for an always-on production backend. If one real image still causes an out-of-memory restart, keep the code as-is and move the backend to an instance with more memory before accepting production traffic.
 
 ---
 

@@ -126,6 +126,11 @@ export default function App() {
   const [showLimitRequest, setShowLimitRequest] = useState(false);
 
   useEffect(() => {
+    // Start the model while the operator enters login details instead of delaying the first image.
+    warmBackendProcessor();
+  }, []);
+
+  useEffect(() => {
     let isMounted = true;
 
     const cachedSession = loadCachedSession();

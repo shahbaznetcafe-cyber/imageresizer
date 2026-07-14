@@ -147,3 +147,38 @@
 - Confirmed from Render logs: database initialization completed before model preload began.
 - Confirmed from Render logs: the process was terminated for using more than 512 MB while loading `u2net`.
 - Pending: Render deployment and one real image test with the lightweight profile.
+
+## 2026-07-15 +05:00
+
+### What Changed
+
+- Started the browser warm-up request as soon as the frontend opens instead of waiting until after operator login.
+- Replaced the rembg session cache with a lock-protected shared session, preventing a warm-up request and the first image request from loading separate model copies at the same time.
+- Documented that Render Free cannot remain always on; it sleeps after inactivity and needs a paid backend instance for continuous availability.
+
+### Files Changed
+
+- `backend/image_processor.py`
+- `frontend/src/App.jsx`
+- `README.md`
+- `CURRENT_TASK.md`
+- `CHANGELOG.md`
+- `NEXT_STEPS.md`
+
+### Why It Changed
+
+- The original warm-up ran only after login, so an operator could reach image processing before the background model load had completed.
+- A single-flight model loader avoids duplicate memory usage while the backend is waking and makes the first processing request wait for the existing warm-up instead of starting another one.
+
+### Risks Or Pending Work
+
+- The initial request after a Render Free sleep can still take about a minute because the instance must start.
+- A paid Render backend is required for an always-live service.
+- Existing user changes in `backend/database.py` and Personal Unlimited files remain untouched.
+
+### Verification
+
+- Passed: `npm.cmd run lint`.
+- Passed: clean Vite production build using `.render-verify-warmup` as a temporary output directory.
+- Blocked: local backend syntax check because this machine still has no usable Python runtime or project virtual environment.
+- Pending: one live Render image-processing test after deployment.

@@ -22,6 +22,7 @@ Move the complete app from paused Vercel hosting to Render while retaining the S
 - Confirmed the corrected Supabase URL gets through database initialization; the backend then failed only while loading the `u2net` model.
 - Diagnosed the current Render failure as a 512 MB free-instance out-of-memory restart caused by preloading the 176 MB `u2net` model before Uvicorn could bind its port.
 - Updated the Render Blueprint to defer model loading and use rembg's lightweight `u2netp` model for the free instance.
+- Moved browser-triggered model warm-up to app launch and made backend model creation single-flight, so login and processing cannot load duplicate rembg sessions concurrently.
 
 ## Remaining Subtasks
 
@@ -33,6 +34,7 @@ Move the complete app from paused Vercel hosting to Render while retaining the S
 - Add `pectaa.shahbaznetcafe.com` to the Render frontend service and update its DNS record after the frontend is live.
 - Redeploy the backend from this lightweight-model checkpoint and confirm `/api/health` responds without an out-of-memory restart.
 - Process one representative school photo. If it still runs out of memory, do not keep retrying on the free plan; move the backend to a larger-memory service.
+- For an always-on backend after launch, change only the Render backend to a paid instance; Free services spin down after 15 minutes of no traffic.
 
 ## Important Files Involved
 
@@ -61,4 +63,4 @@ Move the complete app from paused Vercel hosting to Render while retaining the S
 6. When Python is available, run:
    - `python -m compileall backend`
 7. Open the admin panel and verify the compact scroll sections with real production-like data.
-8. The next recovery step is to verify a lightweight-model Render deploy, then process exactly one real image while watching the logs for memory errors.
+8. The next recovery step is to verify the startup warm-up deploy, then process one real image while watching the logs for memory errors.

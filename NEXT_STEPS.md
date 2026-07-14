@@ -18,12 +18,13 @@
 - Confirmed the corrected Supabase `DATABASE_URL` passes database initialization.
 - Identified the remaining backend crash as a 512 MB memory limit: startup preloaded the 176 MB `u2net` model before the web server bound its port.
 - Updated the Blueprint for a Render Free memory profile: no model preload and rembg's lightweight `u2netp` model.
+- Added an app-launch warm-up request and a backend model-load lock to reduce the first-image delay and prevent duplicate concurrent model loads.
 
 ## Do Next
 
 1. Let Render deploy the latest pushed commit, or use **Manual Deploy** → **Deploy latest commit** for the backend.
 2. Confirm the backend starts and `https://sed-punjab-resizer-backend.onrender.com/api/health` returns `database_backend: "supabase_postgres"` without an out-of-memory log line.
-3. Process exactly one representative school photo and keep the Render logs open. The first request will be slower because it downloads/loads `u2netp` on demand.
+3. Open the frontend and allow the background warm-up to run while entering login details. Then process one representative school photo and keep the Render logs open.
 4. If that request still causes an out-of-memory restart, stop testing the free service and move only the backend to a larger-memory Render instance. Do not change Supabase.
 5. Add `pectaa.shahbaznetcafe.com` to the Render frontend Custom Domains screen and apply the DNS record it gives you after the image test passes.
 6. Open the admin panel and visually confirm long school records, feedback, and limit request sections are easier to use.
@@ -42,6 +43,7 @@
 - The exported `PECTAA-Personal-Unlimited-NoLogin-20260703-150515/` folder duplicates much of the project and may not belong in source control.
 - Render free services can sleep; the first request after inactivity may be slow. Supabase direct database URLs may fail from Render if the Supabase project has no IPv4 add-on, so use the Supabase Session pooler URL.
 - `u2netp` is a lower-memory model and may produce less precise background edges than `u2net`. The full `u2net` model cannot be reliably preloaded in this 512 MB free service.
+- Render Free cannot remain always on: it spins down after 15 minutes without inbound traffic. Use a paid backend service for an always-live production app.
 - The custom domain will remain unavailable until its DNS record is changed from Vercel to the Render static frontend service.
 
 ## Commands To Run Next
@@ -58,9 +60,16 @@ npm.cmd run build
 npm.cmd run lint
 ```
 
+Latest additional verification:
+
+```bash
+cd frontend
+npm.cmd exec vite -- build --outDir .render-verify-warmup
+```
+
 ## Suggested Commit Message
 
 ```bash
-git add render.yaml README.md CURRENT_TASK.md CHANGELOG.md NEXT_STEPS.md
-git commit -m "checkpoint: fit Render backend within free memory"
+git add backend/image_processor.py frontend/src/App.jsx README.md CURRENT_TASK.md CHANGELOG.md NEXT_STEPS.md
+git commit -m "checkpoint: warm Render image processor early"
 ```

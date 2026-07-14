@@ -1,8 +1,8 @@
 import io
 import os
 import tempfile
-from functools import lru_cache
 from math import ceil
+from threading import Lock
 from typing import Optional
 from PIL import Image, ImageFilter, ImageOps
 
@@ -32,14 +32,22 @@ configure_writable_runtime_cache()
 PROCESS_MAX_DIM = int(os.getenv("PROCESS_MAX_DIM", "960"))
 REMBG_MODEL = os.getenv("REMBG_MODEL", "u2net")
 SUBJECT_MARGIN_PX = int(os.getenv("SUBJECT_MARGIN_PX", "3"))
+_rembg_session = None
+_rembg_session_lock = Lock()
 
 
-@lru_cache(maxsize=1)
 def get_rembg_session():
-    """Create the rembg session once so repeated images avoid model reload cost."""
-    from rembg import new_session
+    """Create one shared rembg session and avoid duplicate cold-start model loads."""
+    global _rembg_session
 
-    return new_session(REMBG_MODEL)
+    if _rembg_session is None:
+        with _rembg_session_lock:
+            if _rembg_session is None:
+                from rembg import new_session
+
+                _rembg_session = new_session(REMBG_MODEL)
+
+    return _rembg_session
 
 
 def remove_background(image: Image.Image) -> Image.Image:
