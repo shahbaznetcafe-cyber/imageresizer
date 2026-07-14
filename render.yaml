@@ -25,7 +25,7 @@ services:
       - key: SUBJECT_MARGIN_PX
         value: "3"
       - key: PYTHON_VERSION
-        value: 3.10.12
+        value: 3.11.11
 
   # React frontend. This replaces the paused Vercel deployment.
   - type: web

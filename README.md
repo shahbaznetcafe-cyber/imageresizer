@@ -119,7 +119,7 @@ If you create the backend manually instead of using the Blueprint, use these set
 
 - Service type: `Web Service`
 - Runtime/language: `Python`
-- Python version: `3.12`
+- Python version: `3.11.11` or newer
 - Build command: `pip install -r requirements.txt`
 - Start command: `python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
 
