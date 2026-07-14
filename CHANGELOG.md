@@ -106,6 +106,7 @@
 - Pending: Render Blueprint validation, because Render CLI/MCP access is not available in this workspace.
 - Pending: backend compile/test, because no usable local Python installation is available.
 - Fixed: the first Render backend build could not install `rembg` under Python 3.10.12; the next deploy uses Python 3.11.11.
+- Pending dashboard action: the existing Render backend service still has `PYTHON_VERSION=3.10.12` saved in its Environment settings, which takes precedence over the Blueprint value and must be changed to `3.11.11`.
 - Passed: `npm.cmd run lint`.
 - Blocked: `npm.cmd run build` because Windows denied Vite access to the generated `frontend/dist/assets` directory. This is an existing output-folder lock, not a source compilation error.
 - Passed: a clean Vite production build using a temporary output directory.

@@ -13,11 +13,12 @@
 - Prepared a full Render Blueprint that uses Supabase PostgreSQL through an environment secret and replaces the paused Vercel frontend.
 - Corrected the static frontend Blueprint field required by Render validation.
 - Corrected the Render Python runtime to 3.11.11 so the required `rembg` package can install.
+- Identified a dashboard-saved `PYTHON_VERSION=3.10.12` override that must be changed manually on the existing Render backend service.
 
 ## Do Next
 
 1. Commit and push the full Render deployment configuration.
-2. In Render, create the services from the Blueprint and enter `DATABASE_URL` and `ADMIN_KEY`.
+2. In the Render backend service Environment screen, change `PYTHON_VERSION` to `3.11.11`, save, and deploy the latest commit.
 3. Confirm the backend rebuild installs `rembg` successfully, then verify `https://<render-service>/api/health` returns `database_backend: "supabase_postgres"`.
 4. Add `pectaa.shahbaznetcafe.com` to the Render frontend Custom Domains screen and apply the DNS record it gives you.
 5. Open the admin panel and visually confirm long school records, feedback, and limit request sections are easier to use.
