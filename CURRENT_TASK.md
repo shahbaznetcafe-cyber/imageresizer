@@ -81,3 +81,8 @@ Next recovery action: push this checkpoint, let Render rebuild both services, th
 - Background removal now probes `requestAdapter()` before selecting WebGPU and explicitly falls back to the WASM backend with `fp32`.
 - Production WASM paths use the ONNX Runtime version bundled with Transformers.js, and rejected initialization promises are cleared for retry.
 - Added six automated fallback tests. `npm.cmd test`, `npm.cmd run lint`, and `npm.cmd run build` passed.
+
+## Latest Checkpoint: 15-Image Batch Limit
+
+- Raised the browser upload and backend recording batch limit from 10 to 15 images.
+- The 15-image limit is intentionally below 20 to keep browser memory, previews, and ZIP creation dependable on Android devices.

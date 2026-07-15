@@ -11,10 +11,10 @@ export default function UploadArea({ onFilesSelected }) {
     const newFiles = [...selectedFiles];
     const totalFilesAfterAddition = newFiles.length + files.length;
 
-    if (totalFilesAfterAddition > 10) {
+    if (totalFilesAfterAddition > 15) {
       setError({
-        en: 'You can upload a maximum of 10 images.',
-        ur: 'آپ زیادہ سے زیادہ 10 تصاویر اپ لوڈ کر سکتے ہیں۔'
+        en: 'You can upload a maximum of 15 images.',
+        ur: 'آپ زیادہ سے زیادہ 15 تصاویر اپ لوڈ کر سکتے ہیں۔'
       });
       return;
     }
@@ -134,7 +134,7 @@ export default function UploadArea({ onFilesSelected }) {
         
         <p className="urdu-text text-slate-500 mt-3 text-sm">
           تصاویر کو یہاں کھینچ کر لائیں یا کلک کر کے منتخب کریں <br />
-          <span className="text-xs text-slate-400 font-normal">زیادہ سے زیادہ 10 تصاویر (ہر تصویر حد 10MB)</span>
+          <span className="text-xs text-slate-400 font-normal">زیادہ سے زیادہ 15 تصاویر (ہر تصویر حد 10MB)</span>
         </p>
       </div>
 
@@ -161,7 +161,7 @@ export default function UploadArea({ onFilesSelected }) {
           <div className="flex justify-between items-center pb-3 border-b border-slate-100">
             <h4 className="font-bold text-slate-700 flex items-center gap-2">
               <FileImage size={18} className="text-punjab-blue" />
-              Selected Images ({selectedFiles.length}/10)
+              Selected Images ({selectedFiles.length}/15)
             </h4>
             <span className="text-xs text-slate-400 font-mono font-semibold">
               Ready for Crop Step

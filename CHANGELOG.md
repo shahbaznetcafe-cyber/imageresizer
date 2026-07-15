@@ -4,6 +4,33 @@
 
 ### What Changed
 
+- Raised the maximum browser processing batch from 10 to 15 images.
+- Matched the backend record validation to the same 15-image maximum.
+
+### Files Changed
+
+- `frontend/src/components/UploadArea.jsx`
+- `backend/main.py`
+- `CURRENT_TASK.md`
+- `CHANGELOG.md`
+- `NEXT_STEPS.md`
+
+### Why It Changed
+
+- The user confirmed that processing is now fast enough for a larger batch, while 15 remains safer than 20 for mobile-browser memory and ZIP generation.
+
+### Risks Or Pending Work
+
+- Verify one real 15-image Android batch after Render deploy.
+
+### Verification
+
+- Pending: frontend lint, tests, and production build after the limit increase.
+
+## 2026-07-15 +05:00
+
+### What Changed
+
 - Made browser image processing safe for Android browsers that advertise WebGPU but cannot provide a usable adapter.
 - Added explicit `device: "wasm"` fallback, version-compatible ONNX Runtime WASM paths, clean failure messaging, and retry-safe initialization.
 - Added automated tests for usable WebGPU, missing adapter, adapter error, WebGPU initialization error, WASM error, and retry after failure.

@@ -470,7 +470,7 @@ async def api_process_images(
     files: List[UploadFile] = File(...)
 ):
     """
-    Uploads, validates, processes, and compresses up to 10 images.
+    Uploads, validates, processes, and compresses up to 15 images.
     If multiple files are uploaded, a ZIP is also created.
     Updates the session's processed count.
     """
@@ -499,7 +499,7 @@ async def api_process_images(
         )
         
     # 2. Validate File Count
-    if not files or len(files) < 1 or len(files) > 10:
+    if not files or len(files) < 1 or len(files) > 15:
         record_school_error(
             "invalid_file_count",
             "User tried to process an invalid number of images.",
@@ -510,8 +510,8 @@ async def api_process_images(
         raise HTTPException(
             status_code=400,
             detail={
-                "en": "You must upload between 1 and 10 images.",
-                "ur": "آپ کو 1 سے 10 تصاویر اپ لوڈ کرنی چاہئیں۔"
+                "en": "You must upload between 1 and 15 images.",
+                "ur": "آپ کو 1 سے 15 تصاویر اپ لوڈ کرنی چاہئیں۔"
             }
         )
 
@@ -703,8 +703,8 @@ def api_record_processed_images(
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="Invalid processed image metadata.")
 
-    if not isinstance(processed_images, list) or not processed_images or len(processed_images) > 10:
-        raise HTTPException(status_code=400, detail="You must record between 1 and 10 images.")
+    if not isinstance(processed_images, list) or not processed_images or len(processed_images) > 15:
+        raise HTTPException(status_code=400, detail="You must record between 1 and 15 images.")
 
     clean_images = []
     for image in processed_images:
