@@ -60,6 +60,8 @@ Next batch verification: process a 15-image batch on a typical Android device an
 
 Latest UI cleanup: technical browser/Render memory wording was removed from the upload note.
 
+Latest UI order: the Urdu upload guidance is displayed above the image upload box.
+
 ```bash
 python -m compileall backend
 ```

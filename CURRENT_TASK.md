@@ -90,3 +90,7 @@ Next recovery action: push this checkpoint, let Render rebuild both services, th
 ## Latest Checkpoint: Upload Note Cleanup
 
 - Removed the technical English browser/Render memory line from the upload note, leaving the operator-facing Urdu guidance.
+
+## Latest Checkpoint: Guidance First
+
+- Moved the Urdu upload guidance card above the drag-and-drop upload box so operators read it before selecting photos.

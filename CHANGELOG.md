@@ -4,6 +4,27 @@
 
 ### What Changed
 
+- Moved the Urdu upload guidance card above the drag-and-drop image upload box.
+
+### Files Changed
+
+- `frontend/src/components/UploadArea.jsx`
+- `CURRENT_TASK.md`
+- `CHANGELOG.md`
+- `NEXT_STEPS.md`
+
+### Why It Changed
+
+- Operators now see the important upload guidance before selecting photos.
+
+### Verification
+
+- Pending: frontend lint and production build.
+
+## 2026-07-15 +05:00
+
+### What Changed
+
 - Removed the technical English browser/Render memory sentence from the upload note.
 
 ### Files Changed
