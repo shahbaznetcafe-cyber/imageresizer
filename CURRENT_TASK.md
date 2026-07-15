@@ -86,3 +86,7 @@ Next recovery action: push this checkpoint, let Render rebuild both services, th
 
 - Raised the browser upload and backend recording batch limit from 10 to 15 images.
 - The 15-image limit is intentionally below 20 to keep browser memory, previews, and ZIP creation dependable on Android devices.
+
+## Latest Checkpoint: Upload Note Cleanup
+
+- Removed the technical English browser/Render memory line from the upload note, leaving the operator-facing Urdu guidance.

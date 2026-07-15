@@ -4,6 +4,27 @@
 
 ### What Changed
 
+- Removed the technical English browser/Render memory sentence from the upload note.
+
+### Files Changed
+
+- `frontend/src/components/UploadArea.jsx`
+- `CURRENT_TASK.md`
+- `CHANGELOG.md`
+- `NEXT_STEPS.md`
+
+### Why It Changed
+
+- The operator upload screen should remain concise and user-focused.
+
+### Verification
+
+- Pending: frontend lint and production build.
+
+## 2026-07-15 +05:00
+
+### What Changed
+
 - Raised the maximum browser processing batch from 10 to 15 images.
 - Matched the backend record validation to the same 15-image maximum.
 

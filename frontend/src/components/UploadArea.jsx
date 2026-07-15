@@ -145,10 +145,7 @@ export default function UploadArea({ onFilesSelected }) {
           </div>
           <div dir="rtl" className="urdu-text text-right text-xs leading-6 text-slate-700">
             <p className="font-bold text-slate-800">📌 نوٹ</p>
-            <p className="font-sans" dir="ltr">
-              Background removal now runs in this browser. The first use downloads the model once; later batches are faster and do not use Render server memory.
-            </p>
-            <p className="mt-2">
+            <p>
               پہلی بار براہِ کرم صرف ایک تصویر اپ لوڈ کریں۔ چونکہ پہلی مرتبہ پروسیسنگ ماڈل لوڈ ہوتا ہے، اس لیے اس عمل میں تقریباً 60 سے 90 سیکنڈ لگ سکتے ہیں۔ ماڈل لوڈ ہونے کے بعد آپ باآسانی ایک ساتھ متعدد (Bulk) تصاویر اپ لوڈ کر سکتے ہیں، اور پروسیسنگ کافی تیز ہو جائے گی۔
             </p>
           </div>

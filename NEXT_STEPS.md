@@ -58,6 +58,8 @@ After the Render deploy, refresh the app on Android Chrome and process one JPG. 
 
 Next batch verification: process a 15-image batch on a typical Android device and verify all output downloads and the quota increase are correct.
 
+Latest UI cleanup: technical browser/Render memory wording was removed from the upload note.
+
 ```bash
 python -m compileall backend
 ```
