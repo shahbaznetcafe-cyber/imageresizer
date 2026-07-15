@@ -4,6 +4,40 @@
 
 ### What Changed
 
+- Made browser image processing safe for Android browsers that advertise WebGPU but cannot provide a usable adapter.
+- Added explicit `device: "wasm"` fallback, version-compatible ONNX Runtime WASM paths, clean failure messaging, and retry-safe initialization.
+- Added automated tests for usable WebGPU, missing adapter, adapter error, WebGPU initialization error, WASM error, and retry after failure.
+
+### Files Changed
+
+- `frontend/src/utils/clientImageProcessor.js`
+- `frontend/src/utils/clientImageProcessor.test.js`
+- `frontend/package.json`
+- `frontend/package-lock.json`
+- `CURRENT_TASK.md`
+- `CHANGELOG.md`
+- `NEXT_STEPS.md`
+
+### Why It Changed
+
+- Some Android browsers expose `navigator.gpu` but fail `requestAdapter()`, which previously prevented the implicit runtime fallback from selecting WASM.
+
+### Risks Or Pending Work
+
+- The fallback is unit-tested with an Android-equivalent missing-adapter simulation. A physical Android Chrome image-processing check is still required after Render deploy.
+- Existing user work in `backend/database.py` and the Personal Unlimited export remains untouched.
+
+### Verification
+
+- Passed: `npm.cmd install`
+- Passed: `npm.cmd test` (6 tests)
+- Passed: `npm.cmd run lint`
+- Passed: `npm.cmd run build`
+
+## 2026-07-15 +05:00
+
+### What Changed
+
 - Moved background removal, white-background 600x800 composition, JPEG size fitting, and ZIP creation from the Render backend into the operator's browser.
 - Added a quota-protected backend endpoint that records browser-completed images in Supabase/admin records without receiving image files.
 - Removed rembg/ONNX deployment dependencies and model environment variables from the Render Free configuration.

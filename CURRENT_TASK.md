@@ -74,3 +74,10 @@ Run the app reliably on Render Free while retaining Supabase PostgreSQL, without
 - Frontend lint and production build passed. Local Python checks remain blocked because Python is not installed in this workspace.
 
 Next recovery action: push this checkpoint, let Render rebuild both services, then process one normal JPG in Chrome/Edge and confirm the admin count increases.
+
+## Latest Checkpoint: Android WASM Fallback
+
+- Fixed browsers that expose `navigator.gpu` but cannot return a WebGPU adapter.
+- Background removal now probes `requestAdapter()` before selecting WebGPU and explicitly falls back to the WASM backend with `fp32`.
+- Production WASM paths use the ONNX Runtime version bundled with Transformers.js, and rejected initialization promises are cleared for retry.
+- Added six automated fallback tests. `npm.cmd test`, `npm.cmd run lint`, and `npm.cmd run build` passed.

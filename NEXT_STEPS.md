@@ -54,7 +54,7 @@
 
 ## Commands To Run Next
 
-After the Render deploy, process one JPG in Chrome or Edge and confirm the admin count increases. Refresh any old frontend tab first because it still points at the retired server-processing route.
+After the Render deploy, refresh the app on Android Chrome and process one JPG. The no-WebGPU adapter path is now explicitly tested to use WASM; confirm the 600x800 11-24 KB download and admin count increase. Refresh any old frontend tab first because it still points at the retired server-processing route.
 
 ```bash
 python -m compileall backend

@@ -4,8 +4,6 @@ const SUBJECT_MARGIN_PX = 3;
 const MIN_OUTPUT_BYTES = 11 * 1024;
 const MAX_OUTPUT_BYTES = 24 * 1024;
 
-let backgroundRemoverPromise;
-
 function canvasToBlob(canvas, type, quality) {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
@@ -27,36 +25,66 @@ function loadImage(source) {
   });
 }
 
-async function getBackgroundRemover() {
-  if (!backgroundRemoverPromise) {
-    backgroundRemoverPromise = (async () => {
-      const { pipeline } = await import('@huggingface/transformers');
-      const options = { dtype: 'fp32' };
+export async function createBackgroundRemover(dependencies = {}) {
+  const transformers = dependencies.transformers || await import('@huggingface/transformers');
+  const { pipeline, env } = transformers;
+  const gpu = dependencies.gpu ?? globalThis.navigator?.gpu;
 
-      // WebGPU is faster where available. Falling back to WebAssembly keeps Chrome
-      // and Edge compatible with ordinary school-computer hardware.
-      if (navigator.gpu) {
-        try {
-          return await pipeline('background-removal', 'Xenova/modnet', {
-            ...options,
-            device: 'webgpu',
-          });
-        } catch (error) {
-          console.warn('WebGPU background removal unavailable; using browser CPU.', error);
-        }
+  env.allowLocalModels = false;
+  const onnxVersion = env.backends.onnx.versions?.web;
+  const wasmBaseUrl = onnxVersion
+    ? `https://cdn.jsdelivr.net/npm/onnxruntime-web@${onnxVersion}/dist/`
+    : 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
+  env.backends.onnx.wasm.wasmPaths = {
+    mjs: `${wasmBaseUrl}ort-wasm-simd-threaded.asyncify.mjs`,
+    wasm: `${wasmBaseUrl}ort-wasm-simd-threaded.asyncify.wasm`,
+  };
+
+  const commonOptions = { dtype: 'fp32' };
+
+  if (gpu?.requestAdapter) {
+    try {
+      const adapter = await gpu.requestAdapter();
+      if (adapter) {
+        return await pipeline('background-removal', 'Xenova/modnet', {
+          ...commonOptions,
+          device: 'webgpu',
+        });
       }
-
-      return pipeline('background-removal', 'Xenova/modnet', options);
-    })();
+    } catch (error) {
+      console.warn('WebGPU initialization failed; switching to WASM.', error);
+    }
   }
 
   try {
-    return await backgroundRemoverPromise;
+    return await pipeline('background-removal', 'Xenova/modnet', {
+      ...commonOptions,
+      device: 'wasm',
+    });
   } catch (error) {
-    backgroundRemoverPromise = undefined;
-    throw error;
+    console.error('WASM background removal failed.', error);
+    throw new Error('Background removal could not start on this device. Please refresh and try again.');
   }
 }
+
+export function createBackgroundRemoverLoader(createRemover) {
+  let removerPromise;
+
+  return async () => {
+    if (!removerPromise) {
+      removerPromise = createRemover();
+    }
+
+    try {
+      return await removerPromise;
+    } catch (error) {
+      removerPromise = undefined;
+      throw error;
+    }
+  };
+}
+
+const getBackgroundRemover = createBackgroundRemoverLoader(createBackgroundRemover);
 
 export async function prepareClientBackgroundRemoval() {
   await getBackgroundRemover();
