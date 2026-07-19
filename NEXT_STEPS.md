@@ -1,3 +1,22 @@
+# Latest Checkpoint: Photo Limit Request Control
+
+## Completed
+
+- A machine can now have only one pending photo-limit request at a time.
+- The backend serializes submissions for the same machine and rejects repeats with a clear response.
+- Admin Records now provides `Delete request` for pending requests. Approval and deletion both free the machine to submit another request.
+- Frontend lint, automated tests, production build, and backend compilation passed.
+
+## Do Next
+
+1. Let the Render backend deploy this checkpoint, because the request rule and delete endpoint are backend changes.
+2. In the live app, submit one limit request, then immediately submit a second from the same machine. The second must be refused.
+3. In Admin Records, delete the first request and verify a new request from that machine succeeds. Also verify the normal `Set` approval flow still succeeds.
+
+## Known Risks
+
+- The existing untracked Personal Unlimited export files remain intentionally outside this checkpoint.
+
 # Next Steps
 
 ## Completed

@@ -1216,6 +1216,10 @@ def add_device_usage(device_limit_id: int | None, add_count: int) -> dict:
     return _quota_payload(device)
 
 
+class PendingLimitRequestError(RuntimeError):
+    """Raised when a machine already has a request awaiting admin action."""
+
+
 def create_limit_request(
     session: dict,
     requested_extra: int,
@@ -1231,6 +1235,31 @@ def create_limit_request(
     sender_name = (payment_sender_name or "").strip()[:120]
     sender_phone = "".join(filter(str.isdigit, payment_sender_phone or ""))[:30]
     transaction_id = (payment_transaction_id or "").strip()[:120]
+
+    machine_id = (session.get("machine_id") or "").strip()
+    device_limit_id = session.get("device_limit_id")
+
+    # Serialize submissions per machine so duplicate rapid clicks stay one pending request.
+    request_lock_key = machine_id or f"device-limit:{device_limit_id or session['id']}"
+    if IS_POSTGRES:
+        cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (request_lock_key,))
+    else:
+        cursor.execute("BEGIN IMMEDIATE")
+
+    if machine_id:
+        pending_query = "SELECT id FROM limit_requests WHERE machine_id = {placeholder} AND status = 'pending' LIMIT 1"
+        pending_params = (machine_id,)
+    else:
+        pending_query = "SELECT id FROM limit_requests WHERE device_limit_id = {placeholder} AND status = 'pending' LIMIT 1"
+        pending_params = (device_limit_id,)
+
+    cursor.execute(pending_query.format(placeholder="%s" if IS_POSTGRES else "?"), pending_params)
+    if cursor.fetchone():
+        conn.rollback()
+        conn.close()
+        raise PendingLimitRequestError(
+            "A photo limit request for this machine is already pending. Please wait for the admin to approve or delete it."
+        )
 
     if IS_POSTGRES:
         cursor.execute(
@@ -1366,6 +1395,29 @@ def update_device_limit(device_limit_id: int, photo_limit: int, request_id: int 
     device = _row_to_dict(row)
     conn.close()
     return device
+
+
+def delete_limit_request(request_id: int) -> bool:
+    """Deletes one pending limit request so the machine can submit a fresh one."""
+    conn = _connect()
+    cursor = conn.cursor()
+
+    if IS_POSTGRES:
+        cursor.execute(
+            "DELETE FROM limit_requests WHERE id = %s AND status = 'pending' RETURNING id",
+            (request_id,),
+        )
+        deleted = cursor.fetchone() is not None
+    else:
+        cursor.execute(
+            "DELETE FROM limit_requests WHERE id = ? AND status = 'pending'",
+            (request_id,),
+        )
+        deleted = cursor.rowcount > 0
+
+    conn.commit()
+    conn.close()
+    return deleted
 
 
 def record_school_error(

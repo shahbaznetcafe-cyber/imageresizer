@@ -14,6 +14,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Star,
+  Trash2,
   X,
 } from 'lucide-react';
 import { getApiUrl } from '../utils/api';
@@ -108,7 +109,7 @@ function errorTone(severity) {
   };
 }
 
-function LimitRequestCard({ item, device, saving, onApprove }) {
+function LimitRequestCard({ item, device, saving, onApprove, onDelete }) {
   const suggestedLimit = Number(device?.photo_limit || 35) + Number(item.requested_extra || 150);
   const [nextLimit, setNextLimit] = useState(suggestedLimit);
   const remaining = Math.max(Number(device?.photo_limit || 0) - Number(device?.photos_used || 0), 0);
@@ -204,6 +205,15 @@ function LimitRequestCard({ item, device, saving, onApprove }) {
               Set
             </button>
           </div>
+          <button
+            type="button"
+            disabled={!isPending || saving}
+            onClick={() => onDelete(item.id)}
+            className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-black text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            Delete request
+          </button>
         </div>
       </div>
     </div>
@@ -293,6 +303,34 @@ export default function AdminRecords({ onBack }) {
       await fetchRecords();
     } catch (err) {
       setError(err.message || 'Unable to update device limit.');
+    } finally {
+      setSavingLimit(null);
+    }
+  };
+
+  const deleteLimitRequest = async (requestId) => {
+    setError('');
+    setSavingLimit(requestId);
+
+    const formData = new FormData();
+    formData.append('request_id', String(requestId));
+
+    try {
+      const response = await fetch(getApiUrl('/api/admin/limit-request/delete'), {
+        method: 'POST',
+        headers: {
+          'X-Admin-Key': adminKey.trim(),
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(await getApiErrorMessage(response, 'Unable to delete limit request.'));
+      }
+
+      await fetchRecords();
+    } catch (err) {
+      setError(err.message || 'Unable to delete limit request.');
     } finally {
       setSavingLimit(null);
     }
@@ -426,6 +464,7 @@ export default function AdminRecords({ onBack }) {
                   device={deviceById.get(Number(item.device_limit_id))}
                   saving={savingLimit === item.id}
                   onApprove={approveLimitRequest}
+                  onDelete={deleteLimitRequest}
                 />
               ))}
 

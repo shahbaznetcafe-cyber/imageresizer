@@ -15,6 +15,8 @@ try:
         add_device_usage,
         check_device_quota,
         create_limit_request,
+        delete_limit_request,
+        PendingLimitRequestError,
         get_or_create_device_limit,
         record_feedback,
         record_problem_report,
@@ -35,6 +37,8 @@ except ImportError:
         add_device_usage,
         check_device_quota,
         create_limit_request,
+        delete_limit_request,
+        PendingLimitRequestError,
         get_or_create_device_limit,
         record_feedback,
         record_problem_report,
@@ -436,14 +440,17 @@ def api_limit_request(
     if len(sender_phone_cleaned) < 10 or len(sender_phone_cleaned) > 15:
         raise HTTPException(status_code=400, detail="Payment sender phone must be 10-15 digits.")
 
-    limit_request = create_limit_request(
-        session,
-        requested_extra,
-        message,
-        payment_sender_name=payment_sender_name,
-        payment_sender_phone=sender_phone_cleaned,
-        payment_transaction_id=payment_transaction_id,
-    )
+    try:
+        limit_request = create_limit_request(
+            session,
+            requested_extra,
+            message,
+            payment_sender_name=payment_sender_name,
+            payment_sender_phone=sender_phone_cleaned,
+            payment_transaction_id=payment_transaction_id,
+        )
+    except PendingLimitRequestError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
     return {"success": True, "request": limit_request}
 
 
@@ -461,6 +468,19 @@ def api_admin_device_limit(
     if not device:
         raise HTTPException(status_code=404, detail="Device limit record not found.")
     return {"success": True, "device": device}
+
+
+@app.post("/api/admin/limit-request/delete")
+def api_admin_delete_limit_request(
+    request_id: int = Form(...),
+    x_admin_key: str = Header(default=""),
+):
+    """Removes a pending request that was submitted without a valid payment."""
+    if not ADMIN_KEY or x_admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=401, detail="Invalid admin key.")
+    if not delete_limit_request(request_id):
+        raise HTTPException(status_code=404, detail="Pending limit request not found.")
+    return {"success": True}
 
 
 @app.post("/api/process-images")

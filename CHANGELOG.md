@@ -1,3 +1,33 @@
+## 2026-07-19 +05:00
+
+### What Changed
+
+- Enforced one pending photo-limit request per machine. A repeated request now returns a clear message until the existing request is approved or deleted.
+- Added a protected admin endpoint and a `Delete request` action on every pending Photo Limit Request card.
+- Kept approval behavior intact: approving or deleting a pending request allows that machine to submit a new request.
+
+### Files Changed
+
+- `backend/database.py`
+- `backend/main.py`
+- `frontend/src/components/AdminRecords.jsx`
+- `CURRENT_TASK.md`
+- `CHANGELOG.md`
+- `NEXT_STEPS.md`
+
+### Why It Changed
+
+- Stops unpaid or repeated requests from filling the admin queue while retaining a quick admin cleanup path.
+
+### Risks Or Pending Work
+
+- The backend service must redeploy on Render because the request guard and delete endpoint are server changes.
+
+### Verification
+
+- `frontend`: lint passed, 6 automated tests passed, and production build passed.
+- `backend`: `python -m compileall backend` passed with the available Python 3.13 runtime.
+
 # Changelog
 
 ## 2026-07-15 +05:00

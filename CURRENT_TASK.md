@@ -1,3 +1,32 @@
+# Latest Checkpoint: Photo Limit Request Control
+
+## Current Goal
+
+Prevent duplicate unpaid photo-limit requests per machine and give the admin a fast way to delete pending requests.
+
+## Completed Subtasks
+
+- Added a transaction-safe same-machine pending-request guard for PostgreSQL and SQLite.
+- Added an admin-only endpoint to delete a pending request.
+- Added `Delete request` to the Photo Limit Requests cards without changing the existing approval (`Set`) flow.
+- Passed frontend lint, frontend automated tests, frontend production build, and backend compilation.
+
+## Remaining Subtasks
+
+- Let Render deploy the backend, then verify duplicate, delete, and approval flows with a real school machine.
+
+## Important Files Involved
+
+- `backend/database.py`
+- `backend/main.py`
+- `frontend/src/components/AdminRecords.jsx`
+
+## Recovery Instructions For Next Codex Session
+
+1. Read the checkpoint files and run `git status --short --branch`.
+2. Confirm the deployed backend includes this checkpoint before testing the admin Delete request button.
+3. Test one duplicate request from the same machine, then test deletion and approval independently.
+
 # Current Task
 
 ## Current Goal
