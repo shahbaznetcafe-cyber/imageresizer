@@ -17,6 +17,7 @@ import {
   prepareClientBackgroundRemoval,
   processImageInBrowser,
 } from './utils/clientImageProcessor';
+import { DEFAULT_BACKGROUND_COLOR } from './utils/backgroundColors';
 import JSZip from 'jszip';
 
 const SESSION_CACHE_KEY = 'pectaa-session-cache-v2';
@@ -114,6 +115,7 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [croppedFiles, setCroppedFiles] = useState([]);
+  const [backgroundColor, setBackgroundColor] = useState(DEFAULT_BACKGROUND_COLOR);
   const [results, setResults] = useState([]);
   const [failedImages, setFailedImages] = useState([]);
   const [zipUrl, setZipUrl] = useState(null);
@@ -209,7 +211,7 @@ export default function App() {
 
       for (const item of croppedList) {
         try {
-          const outputBlob = await processImageInBrowser(item.file);
+          const outputBlob = await processImageInBrowser(item.file, backgroundColor);
           const outputName = `${item.originalName.replace(/\.[^.]+$/, '') || 'processed'}.jpg`;
           clientResults.push({
             original_name: item.originalName,
@@ -487,7 +489,11 @@ export default function App() {
                 quotaReached ? (
                   <LimitRequestForm session={session} quota={activeQuota} isQuotaReached />
                 ) : (
-                  <UploadArea onFilesSelected={handleFilesSelected} />
+                  <UploadArea
+                    onFilesSelected={handleFilesSelected}
+                    backgroundColor={backgroundColor}
+                    onBackgroundColorChange={setBackgroundColor}
+                  />
                 )
               )}
               {step === 'crop' && <CropEditor files={uploadedFiles} onCroppingDone={handleCroppingDone} />}

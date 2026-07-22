@@ -120,7 +120,7 @@ function getSubjectBounds(imageData) {
   };
 }
 
-async function createSizedJpeg(transparentImageBlob) {
+async function createSizedJpeg(transparentImageBlob, backgroundColor = '#ffffff') {
   const sourceUrl = URL.createObjectURL(transparentImageBlob);
   try {
     const image = await loadImage(sourceUrl);
@@ -138,7 +138,7 @@ async function createSizedJpeg(transparentImageBlob) {
     const outputContext = outputCanvas.getContext('2d');
     if (!outputContext) throw new Error('Your browser does not support canvas image processing.');
 
-    outputContext.fillStyle = '#ffffff';
+    outputContext.fillStyle = backgroundColor;
     outputContext.fillRect(0, 0, TARGET_WIDTH, TARGET_HEIGHT);
 
     const innerWidth = TARGET_WIDTH - SUBJECT_MARGIN_PX * 2;
@@ -194,7 +194,7 @@ async function padJpegToMinimum(blob) {
   return new Blob([original.slice(0, -2), comment, original.slice(-2)], { type: 'image/jpeg' });
 }
 
-export async function processImageInBrowser(file) {
+export async function processImageInBrowser(file, backgroundColor = '#ffffff') {
   const remover = await getBackgroundRemover();
   const sourceUrl = URL.createObjectURL(file);
 
@@ -202,7 +202,7 @@ export async function processImageInBrowser(file) {
     const output = await remover(sourceUrl);
     const transparentImage = Array.isArray(output) ? output[0] : output;
     const transparentImageBlob = await transparentImage.toBlob();
-    return createSizedJpeg(transparentImageBlob);
+    return createSizedJpeg(transparentImageBlob, backgroundColor);
   } finally {
     URL.revokeObjectURL(sourceUrl);
   }
