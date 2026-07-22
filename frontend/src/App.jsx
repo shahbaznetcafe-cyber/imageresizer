@@ -218,6 +218,7 @@ export default function App() {
             backgroundColor,
             width: cropPreset.width,
             height: cropPreset.height,
+            dpi: cropPreset.dpi,
           });
           const outputName = `${item.originalName.replace(/\.[^.]+$/, '') || 'processed'}.jpg`;
           clientResults.push({

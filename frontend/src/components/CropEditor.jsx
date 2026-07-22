@@ -87,7 +87,9 @@ export default function CropEditor({ files, onCroppingDone, cropPreset = DEFAULT
             <Crop size={18} className="text-punjab-blue" />
             Crop Student/Staff Photo
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">{cropPreset.labelEn} · {cropPreset.width}x{cropPreset.height}</p>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {cropPreset.labelEn} · {cropPreset.width}x{cropPreset.height}{cropPreset.dpi ? ` · ${cropPreset.dpi} DPI` : ''}
+          </p>
         </div>
         
         <div className="text-right">

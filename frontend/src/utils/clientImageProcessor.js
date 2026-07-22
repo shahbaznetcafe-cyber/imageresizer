@@ -165,11 +165,51 @@ function refineAlphaEdges(imageData) {
   }
 }
 
+function setJfifDpi(bytes, dpi) {
+  const isJfifApp0 = bytes[0] === 0xff && bytes[1] === 0xd8
+    && bytes[2] === 0xff && bytes[3] === 0xe0
+    && bytes[6] === 0x4a && bytes[7] === 0x46 && bytes[8] === 0x49 && bytes[9] === 0x46 && bytes[10] === 0x00;
+
+  if (isJfifApp0) {
+    const patched = new Uint8Array(bytes);
+    patched[13] = 1; // units = dots per inch
+    patched[14] = (dpi >> 8) & 0xff;
+    patched[15] = dpi & 0xff;
+    patched[16] = (dpi >> 8) & 0xff;
+    patched[17] = dpi & 0xff;
+    return patched;
+  }
+
+  // No JFIF APP0 segment present (rare, non-standard encoder output): insert one after SOI.
+  if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return bytes;
+  const app0 = new Uint8Array([
+    0xff, 0xe0, 0x00, 0x10,
+    0x4a, 0x46, 0x49, 0x46, 0x00,
+    0x01, 0x01,
+    0x01,
+    (dpi >> 8) & 0xff, dpi & 0xff,
+    (dpi >> 8) & 0xff, dpi & 0xff,
+    0x00, 0x00,
+  ]);
+  const combined = new Uint8Array(2 + app0.length + (bytes.length - 2));
+  combined.set(bytes.subarray(0, 2), 0);
+  combined.set(app0, 2);
+  combined.set(bytes.subarray(2), 2 + app0.length);
+  return combined;
+}
+
+async function applyJpegDpi(blob, dpi) {
+  if (!dpi) return blob;
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  return new Blob([setJfifDpi(bytes, dpi)], { type: 'image/jpeg' });
+}
+
 async function createSizedJpeg(
   transparentImageBlob,
   backgroundColor = '#ffffff',
   targetWidth = DEFAULT_TARGET_WIDTH,
   targetHeight = DEFAULT_TARGET_HEIGHT,
+  dpi = null,
 ) {
   const sourceUrl = URL.createObjectURL(transparentImageBlob);
   try {
@@ -224,7 +264,7 @@ async function createSizedJpeg(
       best = candidate;
     }
 
-    return padJpegToMinimum(best);
+    return padJpegToMinimum(await applyJpegDpi(best, dpi));
   } finally {
     URL.revokeObjectURL(sourceUrl);
   }
@@ -252,6 +292,7 @@ export async function processImageInBrowser(file, options = {}) {
     backgroundColor = '#ffffff',
     width = DEFAULT_TARGET_WIDTH,
     height = DEFAULT_TARGET_HEIGHT,
+    dpi = null,
   } = options;
 
   const remover = await getBackgroundRemover();
@@ -261,7 +302,7 @@ export async function processImageInBrowser(file, options = {}) {
     const output = await remover(sourceUrl);
     const transparentImage = Array.isArray(output) ? output[0] : output;
     const transparentImageBlob = await transparentImage.toBlob();
-    return createSizedJpeg(transparentImageBlob, backgroundColor, width, height);
+    return createSizedJpeg(transparentImageBlob, backgroundColor, width, height, dpi);
   } finally {
     URL.revokeObjectURL(sourceUrl);
   }

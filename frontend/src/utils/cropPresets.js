@@ -12,6 +12,7 @@ export const CROP_PRESETS = [
     labelUr: 'پاسپورٹ سائز (35x45mm)',
     width: 413,
     height: 531,
+    dpi: 300,
   },
 ];
 

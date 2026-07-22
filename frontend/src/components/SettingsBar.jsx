@@ -50,7 +50,7 @@ export default function SettingsBar({
                 <button
                   key={preset.id}
                   type="button"
-                  title={`${preset.width} x ${preset.height}px`}
+                  title={`${preset.width} x ${preset.height}px${preset.dpi ? ` @ ${preset.dpi} DPI` : ''}`}
                   onClick={() => onCropPresetChange(preset)}
                   className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all-custom ${
                     isSelected
