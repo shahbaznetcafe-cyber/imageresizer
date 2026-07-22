@@ -116,10 +116,10 @@ export default function CropEditor({ files, onCroppingDone, cropPreset = DEFAULT
           <div className="mx-6 max-w-md rounded-2xl border border-white/10 bg-white/10 p-6 text-center text-white shadow-xl">
             <FilePreviewName name={currentFileItem.file.name} />
             <p className="mt-3 text-sm font-semibold leading-6">
-              This format cannot be preview-cropped in the browser. It will be processed on the server and downloaded as JPG.
+              This format cannot be preview-cropped, but it will still be processed in your browser and downloaded as JPG.
             </p>
             <p className="mt-2 text-xs text-white/70">
-              Original file will be sent safely; final output remains 600 x 800 JPG.
+              Original file will be sent safely; final output remains {cropPreset.width} x {cropPreset.height} JPG.
             </p>
           </div>
         )}

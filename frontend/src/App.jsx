@@ -226,6 +226,8 @@ export default function App() {
             data_url: await blobToDataUrl(outputBlob),
             output_blob: outputBlob,
             size_kb: Number((outputBlob.size / 1024).toFixed(2)),
+            width: cropPreset.width,
+            height: cropPreset.height,
           });
         } catch (imageError) {
           console.error('Browser image processing failed.', imageError);

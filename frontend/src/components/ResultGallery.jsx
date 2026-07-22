@@ -130,7 +130,7 @@ export default function ResultGallery({ results = [], failedImages = [], zipUrl,
             </p>
             <p className="text-xs text-slate-500 mt-1">
               {hasResults
-                ? <>Processed images have been adjusted to 600x800 px and fit within the <span className="font-semibold text-punjab-green">11KB - 24KB</span> size range.</>
+                ? <>Processed images have been resized per your selected Crop Model and fit within the <span className="font-semibold text-punjab-green">11KB - 24KB</span> size range.</>
                 : 'No files were processed. Please check the details below and upload again.'}
             </p>
           </div>
@@ -196,6 +196,7 @@ export default function ResultGallery({ results = [], failedImages = [], zipUrl,
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
           {results.map((img, index) => {
           const isSizeValid = img.size_kb >= 11 && img.size_kb <= 24;
+          const dimensions = img.width && img.height ? `${img.width} x ${img.height}` : '600 x 800';
 
           return (
             <div
@@ -203,7 +204,10 @@ export default function ResultGallery({ results = [], failedImages = [], zipUrl,
               className="bg-white rounded-2xl border border-slate-100 shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col"
             >
               {/* Image Preview Container */}
-              <div className="relative aspect-[3/4] bg-slate-100 flex items-center justify-center p-2 border-b border-slate-100">
+              <div
+                className="relative bg-slate-100 flex items-center justify-center p-2 border-b border-slate-100"
+                style={{ aspectRatio: img.width && img.height ? `${img.width} / ${img.height}` : '3 / 4' }}
+              >
                 <ImagePreview image={img} getAssetUrl={getAssetUrl} />
                 
                 {/* Size Badge */}
@@ -220,7 +224,7 @@ export default function ResultGallery({ results = [], failedImages = [], zipUrl,
                   <p className="text-xs font-bold text-slate-700 truncate" title={img.original_name}>
                     {img.original_name}
                   </p>
-                  <p className="text-[10px] text-slate-400 font-mono mt-0.5">600 x 800 pixels | JPG</p>
+                  <p className="text-[10px] text-slate-400 font-mono mt-0.5">{dimensions} pixels | JPG</p>
                   
                   {!isSizeValid && (
                     <div className="mt-1 flex items-center gap-1 text-[10px] text-red-500 font-semibold">
