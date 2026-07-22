@@ -1,12 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { UploadCloud, FileImage, Trash2, AlertCircle, ArrowRight, Pin, Check } from 'lucide-react';
-import { BACKGROUND_COLORS, DEFAULT_BACKGROUND_COLOR } from '../utils/backgroundColors';
+import { UploadCloud, FileImage, Trash2, AlertCircle, ArrowRight, Pin } from 'lucide-react';
 
-export default function UploadArea({
-  onFilesSelected,
-  backgroundColor = DEFAULT_BACKGROUND_COLOR,
-  onBackgroundColorChange,
-}) {
+export default function UploadArea({ onFilesSelected }) {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
@@ -125,41 +120,6 @@ export default function UploadArea({
               پہلی بار براہِ کرم صرف ایک تصویر اپ لوڈ کریں۔ چونکہ پہلی مرتبہ پروسیسنگ ماڈل لوڈ ہوتا ہے، اس لیے اس عمل میں تقریباً 60 سے 90 سیکنڈ لگ سکتے ہیں۔ ماڈل لوڈ ہونے کے بعد آپ باآسانی ایک ساتھ متعدد (Bulk) تصاویر اپ لوڈ کر سکتے ہیں، اور پروسیسنگ کافی تیز ہو جائے گی۔
             </p>
           </div>
-        </div>
-      </div>
-
-      {/* Background Color Selector */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-          <h4 className="font-bold text-slate-700 text-sm">Background Colour</h4>
-          <span className="urdu-text text-xs text-slate-400">پس منظر کا رنگ</span>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          {BACKGROUND_COLORS.map((color) => {
-            const isSelected = color.hex === backgroundColor;
-            return (
-              <button
-                key={color.id}
-                type="button"
-                onClick={() => onBackgroundColorChange?.(color.hex)}
-                className={`flex items-center gap-2 py-2 pl-2 pr-3 rounded-xl border transition-all-custom ${
-                  isSelected
-                    ? 'border-punjab-blue bg-blue-50 shadow-sm'
-                    : 'border-slate-200 hover:border-slate-300 bg-white'
-                }`}
-              >
-                <span
-                  className="h-6 w-6 rounded-full border border-slate-200 flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: color.hex }}
-                >
-                  {isSelected && (
-                    <Check size={14} className={color.id === 'white' ? 'text-punjab-blue' : 'text-white'} />
-                  )}
-                </span>
-                <span className="text-xs font-semibold text-slate-700">{color.labelEn}</span>
-              </button>
-            );
-          })}
         </div>
       </div>
 

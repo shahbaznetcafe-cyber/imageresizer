@@ -1,5 +1,5 @@
-const TARGET_WIDTH = 600;
-const TARGET_HEIGHT = 800;
+const DEFAULT_TARGET_WIDTH = 600;
+const DEFAULT_TARGET_HEIGHT = 800;
 const SUBJECT_MARGIN_PX = 3;
 const MIN_OUTPUT_BYTES = 11 * 1024;
 const MAX_OUTPUT_BYTES = 24 * 1024;
@@ -120,7 +120,57 @@ function getSubjectBounds(imageData) {
   };
 }
 
-async function createSizedJpeg(transparentImageBlob, backgroundColor = '#ffffff') {
+function refineAlphaEdges(imageData) {
+  const { data, width, height } = imageData;
+  const pixelCount = width * height;
+  const alpha = new Uint8ClampedArray(pixelCount);
+  for (let i = 0; i < pixelCount; i += 1) alpha[i] = data[i * 4 + 3];
+
+  // Erode: strip the outer ring of the matte so background-colour fringe
+  // (halo) left over from the AI cutout does not carry into the composite.
+  const eroded = new Uint8ClampedArray(alpha);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const idx = y * width + x;
+      if (alpha[idx] === 0) continue;
+      const left = x > 0 ? alpha[idx - 1] : 0;
+      const right = x < width - 1 ? alpha[idx + 1] : 0;
+      const top = y > 0 ? alpha[idx - width] : 0;
+      const bottom = y < height - 1 ? alpha[idx + width] : 0;
+      if (left === 0 || right === 0 || top === 0 || bottom === 0) {
+        eroded[idx] = 0;
+      }
+    }
+  }
+
+  // Feather: a 3x3 box blur on the alpha channel only, smoothing jagged
+  // pixel-mask edges into a soft studio-style cutout.
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const idx = y * width + x;
+      let sum = 0;
+      let count = 0;
+      for (let dy = -1; dy <= 1; dy += 1) {
+        const ny = y + dy;
+        if (ny < 0 || ny >= height) continue;
+        for (let dx = -1; dx <= 1; dx += 1) {
+          const nx = x + dx;
+          if (nx < 0 || nx >= width) continue;
+          sum += eroded[ny * width + nx];
+          count += 1;
+        }
+      }
+      data[idx * 4 + 3] = Math.round(sum / count);
+    }
+  }
+}
+
+async function createSizedJpeg(
+  transparentImageBlob,
+  backgroundColor = '#ffffff',
+  targetWidth = DEFAULT_TARGET_WIDTH,
+  targetHeight = DEFAULT_TARGET_HEIGHT,
+) {
   const sourceUrl = URL.createObjectURL(transparentImageBlob);
   try {
     const image = await loadImage(sourceUrl);
@@ -131,18 +181,21 @@ async function createSizedJpeg(transparentImageBlob, backgroundColor = '#ffffff'
     if (!sourceContext) throw new Error('Your browser does not support canvas image processing.');
 
     sourceContext.drawImage(image, 0, 0, sourceCanvas.width, sourceCanvas.height);
-    const bounds = getSubjectBounds(sourceContext.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height));
+    const sourceImageData = sourceContext.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+    refineAlphaEdges(sourceImageData);
+    sourceContext.putImageData(sourceImageData, 0, 0);
+    const bounds = getSubjectBounds(sourceImageData);
     const outputCanvas = document.createElement('canvas');
-    outputCanvas.width = TARGET_WIDTH;
-    outputCanvas.height = TARGET_HEIGHT;
+    outputCanvas.width = targetWidth;
+    outputCanvas.height = targetHeight;
     const outputContext = outputCanvas.getContext('2d');
     if (!outputContext) throw new Error('Your browser does not support canvas image processing.');
 
     outputContext.fillStyle = backgroundColor;
-    outputContext.fillRect(0, 0, TARGET_WIDTH, TARGET_HEIGHT);
+    outputContext.fillRect(0, 0, targetWidth, targetHeight);
 
-    const innerWidth = TARGET_WIDTH - SUBJECT_MARGIN_PX * 2;
-    const innerHeight = TARGET_HEIGHT - SUBJECT_MARGIN_PX * 2;
+    const innerWidth = targetWidth - SUBJECT_MARGIN_PX * 2;
+    const innerHeight = targetHeight - SUBJECT_MARGIN_PX * 2;
     const scale = Math.max(innerWidth / bounds.width, innerHeight / bounds.height);
     const drawWidth = bounds.width * scale;
     const drawHeight = bounds.height * scale;
@@ -194,7 +247,13 @@ async function padJpegToMinimum(blob) {
   return new Blob([original.slice(0, -2), comment, original.slice(-2)], { type: 'image/jpeg' });
 }
 
-export async function processImageInBrowser(file, backgroundColor = '#ffffff') {
+export async function processImageInBrowser(file, options = {}) {
+  const {
+    backgroundColor = '#ffffff',
+    width = DEFAULT_TARGET_WIDTH,
+    height = DEFAULT_TARGET_HEIGHT,
+  } = options;
+
   const remover = await getBackgroundRemover();
   const sourceUrl = URL.createObjectURL(file);
 
@@ -202,7 +261,7 @@ export async function processImageInBrowser(file, backgroundColor = '#ffffff') {
     const output = await remover(sourceUrl);
     const transparentImage = Array.isArray(output) ? output[0] : output;
     const transparentImageBlob = await transparentImage.toBlob();
-    return createSizedJpeg(transparentImageBlob, backgroundColor);
+    return createSizedJpeg(transparentImageBlob, backgroundColor, width, height);
   } finally {
     URL.revokeObjectURL(sourceUrl);
   }

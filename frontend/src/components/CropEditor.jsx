@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Cropper from 'react-easy-crop';
 import { ZoomIn, ArrowRight, ArrowLeft, Crop, Loader2 } from 'lucide-react';
 import { getCroppedImg } from '../utils/cropImage';
+import { DEFAULT_CROP_PRESET } from '../utils/cropPresets';
 
 function FilePreviewName({ name }) {
   return (
@@ -11,7 +12,8 @@ function FilePreviewName({ name }) {
   );
 }
 
-export default function CropEditor({ files, onCroppingDone }) {
+export default function CropEditor({ files, onCroppingDone, cropPreset = DEFAULT_CROP_PRESET }) {
+  const aspect = cropPreset.width / cropPreset.height;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -85,7 +87,7 @@ export default function CropEditor({ files, onCroppingDone }) {
             <Crop size={18} className="text-punjab-blue" />
             Crop Student/Staff Photo
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">Maintain 3:4 official face proportions</p>
+          <p className="text-xs text-slate-400 mt-0.5">{cropPreset.labelEn} · {cropPreset.width}x{cropPreset.height}</p>
         </div>
         
         <div className="text-right">
@@ -103,7 +105,7 @@ export default function CropEditor({ files, onCroppingDone }) {
             image={currentFileItem.previewUrl}
             crop={crop}
             zoom={zoom}
-            aspect={3 / 4} // Exactly match 600x800 ratio
+            aspect={aspect}
             onCropChange={setCrop}
             onCropComplete={onCropComplete}
             onZoomChange={setZoom}

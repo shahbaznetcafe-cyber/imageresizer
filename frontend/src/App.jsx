@@ -3,6 +3,7 @@ import { CreditCard, School, LogOut, Check, X } from 'lucide-react';
 import LoginRecordForm from './components/LoginRecordForm';
 import UploadArea from './components/UploadArea';
 import CropEditor from './components/CropEditor';
+import SettingsBar from './components/SettingsBar';
 import ProcessingStatus from './components/ProcessingStatus';
 import ResultGallery from './components/ResultGallery';
 import FooterBranding from './components/FooterBranding';
@@ -18,6 +19,7 @@ import {
   processImageInBrowser,
 } from './utils/clientImageProcessor';
 import { DEFAULT_BACKGROUND_COLOR } from './utils/backgroundColors';
+import { DEFAULT_CROP_PRESET } from './utils/cropPresets';
 import JSZip from 'jszip';
 
 const SESSION_CACHE_KEY = 'pectaa-session-cache-v2';
@@ -116,6 +118,7 @@ export default function App() {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [croppedFiles, setCroppedFiles] = useState([]);
   const [backgroundColor, setBackgroundColor] = useState(DEFAULT_BACKGROUND_COLOR);
+  const [cropPreset, setCropPreset] = useState(DEFAULT_CROP_PRESET);
   const [results, setResults] = useState([]);
   const [failedImages, setFailedImages] = useState([]);
   const [zipUrl, setZipUrl] = useState(null);
@@ -211,7 +214,11 @@ export default function App() {
 
       for (const item of croppedList) {
         try {
-          const outputBlob = await processImageInBrowser(item.file, backgroundColor);
+          const outputBlob = await processImageInBrowser(item.file, {
+            backgroundColor,
+            width: cropPreset.width,
+            height: cropPreset.height,
+          });
           const outputName = `${item.originalName.replace(/\.[^.]+$/, '') || 'processed'}.jpg`;
           clientResults.push({
             original_name: item.originalName,
@@ -461,6 +468,18 @@ export default function App() {
           </div>
         )}
 
+        {/* Background colour + crop model, editable until processing starts */}
+        {!showAdmin && !quotaReached && (step === 'upload' || step === 'crop') && (
+          <div className="w-full flex justify-center">
+            <SettingsBar
+              backgroundColor={backgroundColor}
+              onBackgroundColorChange={setBackgroundColor}
+              cropPreset={cropPreset}
+              onCropPresetChange={setCropPreset}
+            />
+          </div>
+        )}
+
         {/* Step components */}
         <div className="w-full flex justify-center">
           {showAdmin ? (
@@ -489,14 +508,16 @@ export default function App() {
                 quotaReached ? (
                   <LimitRequestForm session={session} quota={activeQuota} isQuotaReached />
                 ) : (
-                  <UploadArea
-                    onFilesSelected={handleFilesSelected}
-                    backgroundColor={backgroundColor}
-                    onBackgroundColorChange={setBackgroundColor}
-                  />
+                  <UploadArea onFilesSelected={handleFilesSelected} />
                 )
               )}
-              {step === 'crop' && <CropEditor files={uploadedFiles} onCroppingDone={handleCroppingDone} />}
+              {step === 'crop' && (
+                <CropEditor
+                  files={uploadedFiles}
+                  onCroppingDone={handleCroppingDone}
+                  cropPreset={cropPreset}
+                />
+              )}
               {step === 'processing' && <ProcessingStatus files={croppedFiles} />}
               {step === 'result' && (
                 <ResultGallery
